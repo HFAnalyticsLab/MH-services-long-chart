@@ -1,0 +1,1039 @@
+---
+title: "The impact of COVID on children and young people's mental health in Britain (draft)"
+author: "Sebastien Peytrignet"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+---
+
+<!-- TO-DO -->
+<!-- Delete all files and re-download from web,
+because MHSDS sometimes 'fixes' files ex-post
+But keep old ones in case they get deleted-->
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#Clean up the global environment
+rm(list = ls())
+
+#Load packages
+library("tidyverse")
+library("lubridate")
+library("here")
+library("data.table")
+library("plotly")
+library("hrbrthemes")
+library("readxl")
+library("DescTools")
+
+#File locations
+onedrive_charts_data <- "C:/Users/SebastienP/OneDrive - The Health Foundation/NDL Topic 2/Data for flourish charts/"
+clean_data_dir <- "M:/Analytics/Sebastien/GitHub/MHSDS-pipeline/Clean data for dashboard/"
+
+#Load main performance data
+MHSDS_main_pooled_dashboard <- fread(paste0(clean_data_dir,"MHSDS_main_pooled.csv"),header=TRUE, sep=",", check.names=T)
+
+#Load ED data
+MHSDS_ED_pooled_dashboard <- fread(paste0(clean_data_dir,"MHSDS_ED_pooled.csv"),header=TRUE, sep=",", check.names=T)
+
+#Load additional data on waiting times
+MHSDS_wait_times <- read_excel(paste0(clean_data_dir,"additional_cyp_wait_times_1920.xlsx"), sheet = "1b",skip=17)
+
+#Load Scotland data
+scotland_camhs_appended <- fread(paste0(clean_data_dir,"scotland_camhs_appended.csv"),header=TRUE, sep=",", check.names=T)
+
+#Load Wales data
+wales_camhs <- fread(paste0(clean_data_dir,"wales_camhs.csv"),header=TRUE, sep=",", check.names=T)
+
+#Load workforce data
+NHS_workforce_doctors <- read_excel(
+  paste0(clean_data_dir,"NHS workforce statistics - data.xlsx"))
+
+#Load workforce data
+NHS_workforce_other <- read_excel(
+  paste0(clean_data_dir,"NHS workforce statistics - other - data.xlsx"))
+```
+
+<!-- #ENGLAND -->
+
+<!-- ### 1. People being seen -->
+
+<!-- #People in contact (equ. to patients seen?) -->
+
+<!-- ### 2. People waiting to be seen -->
+
+<!-- #Open referrals -->
+<!-- #New referrals starting in period [is this a subset of the above] -->
+<!-- #Crisis referrals -->
+
+<!-- ### 3. How long does it take to be seen? -->
+
+<!-- #Average waiting times (FY 19/20 [pre-COVID] by quarter) -->
+<!-- #ED: number waiting for treatment (urgent and non urgent) -->
+<!-- #ED: % starting within target time (urgent and non urgent) -->
+
+<!-- ### 4. How are people being seen? (OPTIONAL) -->
+
+<!-- #Consultation medium -->
+
+<!-- ### 5. Supply and demand -->
+
+<!-- #People being seen vs. FTE doctors and nurses -->
+
+<!-- #SCOTLAND -->
+
+<!-- ### 1. People being seen -->
+
+<!-- #OpenCases -->
+
+<!-- ### 2. People waiting to be seen -->
+
+<!-- #TotalPatientsWaiting -->
+<!-- #ReferralsReceived -->
+<!-- #ReferralsAccepted -->
+<!-- #pct_accepted -->
+
+<!-- ### 3. How long does it take to be seen? -->
+
+<!-- #MedianWeeksPatientsSeen -->
+<!-- #X90thPercentileWeeksPatientsSeen -->
+
+<!-- #WALES -->
+
+<!-- #Numbers waitng for sCAMHS -->
+<!-- #% waiting under or over 4 weeks -->
+
+## Number of children & adolescents (6-16 yrs) with mental health conditions {.tabset}
+
+<!-- KEY FACTS -->
+
+<!-- - The proportion of 6-16 year old with a probable mental health condition increased from about 12% to about 17% between 2017 and 2021. In absolute terms, taking population growth into account, that's over 480,000 additional children and teenagers with probable mental health conditions. -->
+
+<!-- - This could be driven by many factors, some predating the pandemic and some attributable to COVID, lockdowns and school closures. -->
+
+<!-- - The impact has differed by sex, age group and socioeconomic background. We can break this down further. -->
+
+<!-- - How has the service coped with this increased demand? -->
+
+### England
+
+Source: NHS England
+
+```{r prevalence.england, echo=FALSE, message=FALSE, warning=FALSE,fig.width=8,fig.height=6}
+
+#Data
+survey.data <- data.frame(est.number=c(830040,1253264,1314867),
+                          est.prev=c(11.6,16.6,17.4),
+                          year=c(2017,2020,2021)) %>%
+  mutate(.,est.prev=est.prev/100)
+
+#Chart 1
+survey.chart <-ggplot(data=survey.data, aes(x=year, y=est.prev)) +
+  geom_bar(stat="identity", fill="deeppink3") +
+  scale_y_continuous(labels = scales::percent) +
+  theme_ipsum() +
+  ylab("Percentage of 6-16 yr old with probable condition") +
+  theme(legend.position="bottom",
+        panel.border = element_blank(),
+        strip.text = element_text(size=8),
+        text = element_text(size = 8),
+        legend.title=element_text(size=8),
+        legend.text=element_text(size=8),
+        axis.text = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.text.x = element_text(angle = 45, hjust = 1,size = 8),
+        axis.title.x = element_text(margin = unit(c(3, 0, 0, 0), "mm"),size = 8),
+        axis.title.y = element_text(size = 8))
+ggplotly(survey.chart)
+
+#Save for Flourish
+survey.data %>%
+  select(.,year,est.prev,est.number) %>%
+  fwrite(.,paste0(onedrive_charts_data,"Fig1.csv"))
+
+#Chart 2
+survey.chart.bis <-ggplot(data=survey.data, aes(x=year, y=est.number)) +
+  geom_bar(stat="identity", fill="deeppink4") +
+  scale_y_continuous(labels = scales::comma) +
+  theme_ipsum() +
+  ylab("Number of 6-16 yr old with probable condition") +
+  theme(legend.position="bottom",
+        panel.border = element_blank(),
+        strip.text = element_text(size=8),
+        text = element_text(size = 8),
+        legend.title=element_text(size=8),
+        legend.text=element_text(size=8),
+        axis.text = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.text.x = element_text(angle = 45, hjust = 1,size = 8),
+        axis.title.x = element_text(margin = unit(c(3, 0, 0, 0), "mm"),size = 8),
+        axis.title.y = element_text(size = 8))
+ggplotly(survey.chart.bis)
+
+```
+
+## Number of people in contact with CAMHS (incl. first contact) {.tabset}
+
+<!-- KEY FACTS -->
+
+<!-- - In England, mental health services for children and young people are seeing a lot more people than they used to. -->
+<!-- - In fact, the number of people in contact is the highest it's ever been (or as far back as data goes). During July 2020, over 340,000 children and young people were in contact with the service. -->
+<!-- - Since the beginning of the pandemic, this figure has consistently been at least 15% higher than in the previous year. During the winter months of 2020, it was 30% higher [month-to-month comparisons to adjust for seasonality]. -->
+<!-- - CAMHS has rapidly accelerated the number of new people it is seeing, presumably to expand the service and in an attempt to get through the rising backlog of referrals. At one point, in May 2021, the number of first contacts for over 18's was 60% higher than at the same time the year before - but that's probably because first contacts were very low in the middle of COVID. -->
+
+### England
+
+```{r CAMHS.england, echo=FALSE, message=FALSE, warning=FALSE,fig.width=8,fig.height=6}
+#Data
+CAMHS_contacts_data <- MHSDS_main_pooled_dashboard %>%
+  filter(PRIMARY_LEVEL_DESCRIPTION=="England",
+         MEASURE_ID %in% c("CYP01","MHS61a","CYP23","MHS30d","MHS32a")) %>%
+  filter(.,!(MEASURE_ID=="MHS32a"&BREAKDOWN!="England")) %>% 
+  mutate(MEASURE_KEY=case_when(
+           MEASURE_ID=="MHS30d" ~ "Attended contacts (<18)",
+           MEASURE_ID=="CYP01" ~ "People in contact",
+           MEASURE_ID=="MHS61a" ~ "First contacts",
+           MEASURE_ID=="CYP23" ~ "Open referrals",
+           MEASURE_ID=="MHS32a" ~ "New referrals",
+           TRUE ~ "NA"
+         )) %>% 
+  select(.,start_date,end_date,PRIMARY_LEVEL_DESCRIPTION,MEASURE_ID,MEASURE_KEY,MEASURE_VALUE) %>% 
+  mutate(.,MEASURE_VALUE=as.numeric(MEASURE_VALUE),
+         timing=ifelse(start_date<ymd("2020-04-01"),"Pre-COVID","Post-COVID"),
+         MEASURE_VALUE=as.numeric(MEASURE_VALUE)) %>%
+  mutate(.,timing=fct_relevel(timing, c("Pre-COVID","Post-COVID"))) %>% 
+  arrange(.,start_date) %>%
+  as_tibble()
+
+#Chart
+CAMHS_contacts_chart <- CAMHS_contacts_data %>%
+  filter(.,MEASURE_ID!="CYP23") %>% 
+  ggplot(., aes(x=start_date, y=MEASURE_VALUE, group= MEASURE_KEY)) +
+  geom_line(aes(color= MEASURE_KEY),
+            size=1) +
+  scale_x_date(date_labels = "%b %Y",date_breaks = "3 months") +
+  scale_y_continuous(labels = scales::comma) +
+  facet_wrap(~timing, scales = "free_x") +
+  theme_ipsum() +
+  xlab("") +
+  ylab("") +
+  labs(col="") +
+  scale_color_brewer(palette = "Set1") +
+  theme(legend.position="bottom",
+        panel.border = element_blank(),
+        strip.text = element_text(size=8),
+        text = element_text(size = 8),
+        legend.title=element_text(size=8),
+        legend.text=element_text(size=8),
+        axis.text = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.text.x = element_text(angle = 45, hjust = 1,size = 8),
+        axis.title.x = element_text(margin = unit(c(3, 0, 0, 0), "mm"),size = 8),
+        axis.title.y = element_text(size = 8))
+  
+ggplotly(CAMHS_contacts_chart)
+
+#Save for Flourish
+levels_data_flourish <- CAMHS_contacts_data %>%
+  select(.,start_date,MEASURE_VALUE,MEASURE_KEY,timing) %>%
+  mutate(country="England")
+```
+
+### Scotland
+
+```{r CAMHS.scotland, echo=FALSE, message=FALSE, warning=FALSE,fig.width=8,fig.height=6}
+#Data
+CAMHS_contacts_Scotland_data <- scotland_camhs_appended %>%
+  filter(HB=="S92000003") %>%
+  mutate(.,MEASURE_VALUE=as.numeric(Count),
+         timing=ifelse(year_month<ymd("2020-04-01"),"Pre-COVID","Post-COVID"),
+         MEASURE_KEY=case_when(
+           Metric=="OpenCases" ~ "People in contact",
+           Metric=="ReferralsReceived" ~ "Referrals received",
+           Metric=="ReferralsAccepted" ~ "Referrals accepted",
+           Metric=="TotalPatientsWaiting" ~ "People waiting",
+           Metric=="TotalPatientsSeen" ~ "First contacts",
+           TRUE ~ "NA"
+         )) %>%
+  rename(start_date=year_month) %>% 
+  filter(MEASURE_KEY %in% c("People in contact",
+                            "Referrals received",
+                            "Referrals accepted",
+                            "People waiting",
+                            "First contacts")) %>% 
+  mutate(.,timing=fct_relevel(timing, c("Pre-COVID","Post-COVID"))) %>% 
+  arrange(.,start_date) %>%
+  as_tibble()
+
+#Chart
+CAMHS_contacts_Scotland_chart <- CAMHS_contacts_Scotland_data %>%
+  filter(start_date>=ymd("2018-04-01"),
+         MEASURE_KEY=="People in contact") %>%
+  ggplot(., aes(x=start_date, y=MEASURE_VALUE)) +
+  geom_line(col="cornflowerblue",size=1) +
+  scale_x_date(date_labels = "%b %Y",date_breaks = "3 months") +
+  scale_y_continuous(labels = scales::comma) +
+  facet_wrap(~timing, scales = "free_x") +
+  theme_ipsum() +
+  xlab("") +
+  ylab("") +
+  labs(col="") +
+  scale_color_brewer(palette = "Set1") +
+  theme(legend.position="bottom",
+        panel.border = element_blank(),
+        strip.text = element_text(size=8),
+        text = element_text(size = 8),
+        legend.title=element_text(size=8),
+        legend.text=element_text(size=8),
+        axis.text = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.text.x = element_text(angle = 45, hjust = 1,size = 8),
+        axis.title.x = element_text(margin = unit(c(3, 0, 0, 0), "mm"),size = 8),
+        axis.title.y = element_text(size = 8))
+
+ggplotly(CAMHS_contacts_Scotland_chart) %>% 
+  layout(legend = list(orientation = 'h'))
+
+#Save for Flourish
+levels_data_flourish <- CAMHS_contacts_Scotland_data %>%
+  select(.,start_date,MEASURE_VALUE,MEASURE_KEY,timing) %>%
+  mutate(.,country="Scotland") %>%
+  plyr::rbind.fill(.,levels_data_flourish) %>% 
+  pivot_wider(
+    names_from = MEASURE_KEY,
+    names_sep = ".",
+    values_from = MEASURE_VALUE
+  ) %>%
+  filter(.,start_date>=ymd("2019-04-01"))
+fwrite(levels_data_flourish,paste0(onedrive_charts_data,"Fig2B.csv"))
+```
+
+## Size of waiting list {.tabset}
+
+<!-- KEY FACTS -->
+
+<!-- - More people than ever are being seen. But what about the size of the waiting list? -->
+<!-- - As of July 2020, there were 380,000 open referrals, the highest number ever. -->
+<!-- - The number of open referrals follows a similar trend to the number of people being seen: at least 15% higher since beginning of pandemic, and 30% higher during winter months of 2020. -->
+<!-- - For eating disorders, a part of the system that has historically been over-stretched, the number of people waiting to be seen is over 10,000 for the first time (about a quarter of which are urgent cases) -->
+
+### England
+
+CYP23 ("Open referrals", the number of open referrals in children and young people mental health services)
+
+ED88 and ED89 ("People waiting to be seen for eating disorders (<18 yrs)")
+
+```{r new.referrals.england, echo=FALSE, message=FALSE, warning=FALSE,fig.width=8,fig.height=6}
+
+#CAMHS
+
+CAMHS_open_referrals_data <- MHSDS_main_pooled_dashboard %>%
+  filter(PRIMARY_LEVEL_DESCRIPTION=="England") %>%
+  filter(.,MEASURE_ID %in% c("CYP23","MHS32a")) %>%
+  filter(.,!(MEASURE_ID=="MHS32a"&BREAKDOWN!="England")) %>% 
+  select(.,start_date,end_date,PRIMARY_LEVEL_DESCRIPTION,MEASURE_ID,MEASURE_VALUE) %>%
+  mutate(MEASURE_KEY=case_when(
+           MEASURE_ID=="CYP23" ~ "Open referrals",
+           MEASURE_ID=="MHS32a" ~ "New referrals",
+           TRUE ~ "NA"
+         )) %>% 
+  mutate(.,MEASURE_VALUE=as.numeric(MEASURE_VALUE),
+         timing=ifelse(start_date<ymd("2020-04-01"),"Pre-COVID","Post-COVID"),
+         MEASURE_VALUE=as.numeric(MEASURE_VALUE)) %>%
+  mutate(.,timing=fct_relevel(timing, c("Pre-COVID","Post-COVID"))) %>% 
+  arrange(.,start_date) %>%
+  as_tibble()
+
+CAMHS_open_referrals_chart <- CAMHS_open_referrals_data %>%
+  ggplot(., aes(x=start_date, y=MEASURE_VALUE)) +
+  geom_line(aes(color= MEASURE_KEY), size=1) +
+  scale_x_date(date_labels = "%b %Y",date_breaks = "3 months") +
+  scale_y_continuous(labels = scales::comma) +
+  facet_wrap(~timing, scales = "free_x") +
+  theme_ipsum() +
+  xlab("") +
+  ylab("") +
+  labs(col="",title="CAMHS") +
+  scale_color_brewer(palette = "Set1") +
+  theme(legend.position="bottom",
+        panel.border = element_blank(),
+        strip.text = element_text(size=8),
+        text = element_text(size = 8),
+        legend.title=element_text(size=8),
+        legend.text=element_text(size=8),
+        axis.text = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.text.x = element_text(angle = 45, hjust = 1,size = 8),
+        axis.title.x = element_text(margin = unit(c(3, 0, 0, 0), "mm"),size = 8),
+        axis.title.y = element_text(size = 8))
+  
+ggplotly(CAMHS_open_referrals_chart)
+
+#Eating disorders
+
+number_waiting_ed_data_new <- MHSDS_main_pooled_dashboard %>%
+  filter(.,PRIMARY_LEVEL_DESCRIPTION=="England",
+         MEASURE_ID %in% c("ED88","ED89")) %>%
+  select(.,start_date,end_date,PRIMARY_LEVEL_DESCRIPTION,MEASURE_ID,MEASURE_VALUE)
+
+number_waiting_ed_data <- MHSDS_ED_pooled_dashboard %>%
+  filter(.,PRIMARY_LEVEL_DESCRIPTION=="England",
+         MEASURE_ID %in% c("ED88","ED89")) %>%
+  select(.,start_date,end_date,PRIMARY_LEVEL_DESCRIPTION,MEASURE_ID,MEASURE_VALUE) %>%
+  plyr::rbind.fill(.,number_waiting_ed_data_new) %>% 
+  pivot_wider(names_from = MEASURE_ID,
+              names_sep = "_",
+              values_from = MEASURE_VALUE) %>%
+  rename(.,urgent="ED89",
+         all="ED88") %>%
+  mutate(.,`non urgent`=as.numeric(all)-as.numeric(urgent),
+         all=as.numeric(all),
+         urgent=as.numeric(urgent)) %>%
+  pivot_longer(
+    cols = all:`non urgent`,
+    names_to = c("type"),
+    values_to = "count"
+  ) %>%
+  filter(.,type!="all") %>%
+  mutate(.,timing=ifelse(end_date<ymd("2020-04-01"),"Pre-COVID","Post-COVID")) %>%
+  mutate(.,timing=fct_relevel(timing, c("Pre-COVID","Post-COVID")))
+
+number_waiting_ed_chart <- number_waiting_ed_data %>%
+  filter(.,end_date>=lubridate::ymd("2020-07-01")) %>% 
+  ggplot(.) +
+  geom_bar(aes(x=end_date, y=count, fill=type), position="stack", stat="identity") +
+  scale_x_date(date_labels = "%b %Y",date_breaks = "1 month") +
+  scale_y_continuous(labels = scales::comma) +
+  facet_wrap(~timing, scales = "free_x") +
+  theme_ipsum() +
+  xlab("") +
+  ylab("") +
+  labs(fill="",title="Eating disorders (<18)") +
+  scale_fill_manual(values=
+                      c("urgent" = "brown", "non urgent" = "darkseagreen4")) +
+  theme(legend.position="bottom",
+        panel.border = element_blank(),
+        strip.text = element_text(size=8),
+        text = element_text(size = 8),
+        legend.title=element_text(size=8),
+        legend.text=element_text(size=8),
+        axis.text = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.text.x = element_text(angle = 45, hjust = 1,size = 8),
+        axis.title.x = element_text(margin = unit(c(3, 0, 0, 0), "mm"),size = 8),
+        axis.title.y = element_text(size = 8))
+
+ggplotly(number_waiting_ed_chart)
+```
+
+### Scotland
+
+People waiting: Number of patients waiting for treatment at the end of the month given at NHS Board level.
+Number of referrals received into the board that month and the number of those referrals that were accepted by the board.
+
+```{r new.referrals.scotland, echo=FALSE, message=FALSE, warning=FALSE,fig.width=8,fig.height=6}
+People_waiting_Scotland_data <- scotland_camhs_appended %>%
+  filter(HB=="S92000003",
+         Metric %in% c("TotalPatientsWaiting","ReferralsReceived","ReferralsAccepted")) %>%
+  mutate(.,MEASURE_VALUE=as.numeric(Count),
+         timing=ifelse(year_month<ymd("2020-04-01"),"Pre-COVID","Post-COVID")) %>%
+  mutate(.,timing=fct_relevel(timing, c("Pre-COVID","Post-COVID"))) %>% 
+  arrange(.,year_month) %>%
+  as_tibble()
+
+People_waiting_Scotland_chart <- People_waiting_Scotland_data %>%
+  filter(year_month>=ymd("2018-04-01")) %>% 
+  ggplot(., aes(x=year_month, y=MEASURE_VALUE, group= Metric)) +
+  geom_line(aes(color= Metric), size=1) +
+  scale_x_date(date_labels = "%b %Y",date_breaks = "3 months") +
+  scale_y_continuous(labels = scales::comma) +
+  facet_wrap(~timing, scales = "free_x") +
+  theme_ipsum() +
+  xlab("") +
+  ylab("") +
+  labs(col="") +
+  scale_color_brewer(palette = "Set1") +
+  theme(legend.position="bottom",
+        panel.border = element_blank(),
+        strip.text = element_text(size=8),
+        text = element_text(size = 8),
+        legend.title=element_text(size=8),
+        legend.text=element_text(size=8),
+        axis.text = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.text.x = element_text(angle = 45, hjust = 1,size = 8),
+        axis.title.x = element_text(margin = unit(c(3, 0, 0, 0), "mm"),size = 8),
+        axis.title.y = element_text(size = 8))
+
+ggplotly(People_waiting_Scotland_chart)
+```
+
+### Wales
+
+Number of people on waiting list. A monthly data release showing first appointment waiting times for Specialist Child and Adolescent Mental Health Services (sCAMHS).
+
+```{r new.referrals.wales, echo=FALSE, message=FALSE, warning=FALSE,fig.width=8,fig.height=6}
+People_waiting_Wales_data <- wales_camhs %>%
+  filter(Metric=="all") %>%
+  mutate(.,
+         MEASURE_VALUE=as.numeric(Count),
+         timing=ifelse(month_year<ymd("2020-04-01"),"Pre-COVID","Post-COVID")) %>%
+  mutate(.,timing=fct_relevel(timing, c("Pre-COVID","Post-COVID"))) %>% 
+  arrange(.,month_year) %>%
+  as_tibble()
+
+People_waiting_Wales_chart <- People_waiting_Wales_data %>%
+  ggplot(., aes(x=month_year, y=MEASURE_VALUE, group= Metric)) +
+  geom_line(aes(color= Metric), size=1) +
+  scale_x_date(date_labels = "%b %Y",date_breaks = "3 months") +
+  scale_y_continuous(labels = scales::comma) +
+  facet_wrap(~timing, scales = "free_x") +
+  theme_ipsum() +
+  xlab("") +
+  ylab("") +
+  labs(col="") +
+  scale_color_brewer(palette = "Set1") +
+  theme(legend.position="bottom",
+        panel.border = element_blank(),
+        strip.text = element_text(size=8),
+        text = element_text(size = 8),
+        legend.title=element_text(size=8),
+        legend.text=element_text(size=8),
+        axis.text = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.text.x = element_text(angle = 45, hjust = 1,size = 8),
+        axis.title.x = element_text(margin = unit(c(3, 0, 0, 0), "mm"),size = 8),
+        axis.title.y = element_text(size = 8))
+
+ggplotly(People_waiting_Wales_chart)
+```
+
+## Time to be seen {.tabset}
+
+<!-- KEY FACTS -->
+
+<!-- - NHS Digital doesn't openly release data on post-COVID waiting times to access CAMHS. However, we know that the average time to be seen **in the year preceding COVID** (FY 2019/20) was just over a month (43 days). In some CCGs the average was almost 3 months, and others have highlighted evidence of a postcode lottery. -->
+<!-- - However, averages hide the fact that some people were waiting much longer. In FY 2019/20. 6% of people in contact had been waiting over 3 months, 22% were still waiting and in 27% of cases the referral had been closed before treatment started (for a variety of reasons, including the referral not being deemed suitable). -->
+<!-- - We do have recent data on waiting times for under 18s with eating disorders. Since the beginning of 2021, only half of non-urgent cases are being seen within a month. Fewer than half of urgent cases are being seen within a week. -->
+
+### England
+
+Data from financial year 2019/2020 (just before COVID)
+
+```{r time.seen.england, echo=FALSE, message=FALSE, warning=FALSE,fig.width=8,fig.height=6}
+
+#MHSDS 2019 data
+MHSDS_wait_times_clean <- MHSDS_wait_times %>%
+  filter(`Organisation Code`=="England") %>%
+  mutate_all(as.character) %>% 
+  pivot_longer(cols = `Total number of People`:`Contacts Before Referral`,
+               names_to = c("Metric"),
+               values_to = "Value")
+
+wait_time_bar_chart_data <- MHSDS_wait_times_clean %>%
+  filter(.,str_detect(Metric,"%")) %>%
+  mutate(.,Value=as.numeric(Value),
+         Metric=factor(Metric, levels=c("% Referral Closed Before Treatment",
+                                        "% Still Waiting, no contact",
+                                        "% Still Waiting, one contact",
+                                        "% Waiting Between 0 and 4 Weeks",
+                                        "% Waiting Between 4 and 6 Weeks",
+                                        "% Waiting Between 6 and 8 Weeks",
+                                        "% Waiting Between 8 and 10 Weeks",
+                                        "% Waiting Between 10 and 12 Weeks",
+                                        "% Waiting Over 12 Weeks")))
+
+#MHSDS 2019 chat
+wait_time_bar_chart <- ggplot(wait_time_bar_chart_data, aes(fill=Metric, y=Value, x=`Organisation Name`)) + 
+  geom_bar(position="fill",stat="identity") +
+  scale_y_continuous(labels = scales::percent) +
+  theme_ipsum()
+
+ggplotly(wait_time_bar_chart)
+
+#Eating disorders data
+
+target_time_ed_data_new <- MHSDS_main_pooled_dashboard %>%
+  filter(.,PRIMARY_LEVEL_DESCRIPTION=="England",
+         MEASURE_ID %in% c("ED86e","ED87e")) %>%
+  select(.,start_date,end_date,PRIMARY_LEVEL_DESCRIPTION,MEASURE_ID,MEASURE_VALUE)
+  
+target_time_ed_data <- MHSDS_ED_pooled_dashboard %>%
+  filter(.,PRIMARY_LEVEL_DESCRIPTION=="England",
+         MEASURE_ID %in% c("ED86e","ED87e")) %>%
+  select(.,start_date,end_date,PRIMARY_LEVEL_DESCRIPTION,MEASURE_ID,MEASURE_VALUE) %>%
+  plyr::rbind.fill(.,target_time_ed_data_new) %>% 
+  mutate(.,timing=ifelse(end_date<ymd("2020-04-01"),"Pre-COVID","Post-COVID")) %>%
+  mutate(.,timing=fct_relevel(timing, c("Pre-COVID","Post-COVID"))) %>%
+  mutate(.,MEASURE_VALUE=as.numeric(MEASURE_VALUE),
+         Type=case_when(MEASURE_ID=="ED86e" ~ "urgent",
+                        MEASURE_ID=="ED87e" ~ "non urgent",
+                        TRUE ~ "NA"))
+
+#Eating disorders chart
+target_time_ed_chart <- target_time_ed_data %>%
+  ggplot(., aes(x=end_date, y=MEASURE_VALUE, group=Type)) +
+  geom_line(aes(color=Type),size=1) +
+  scale_x_date(date_labels = "%b %Y",date_breaks = "1 month") +
+  scale_y_continuous(labels = scales::comma) +
+  facet_wrap(~timing, scales = "free_x") +
+  theme_ipsum() +
+  xlab("") +
+  ylab("") +
+  labs(col="", title="Eating disorders: share of people starting within target time") +
+  scale_colour_manual(values=
+                      c("urgent" = "brown", "non urgent" = "darkseagreen4")) +
+  theme(legend.position="bottom",
+        panel.border = element_blank(),
+        strip.text = element_text(size=8),
+        text = element_text(size = 8),
+        legend.title=element_text(size=8),
+        legend.text=element_text(size=8),
+        axis.text = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.text.x = element_text(angle = 45, hjust = 1,size = 8),
+        axis.title.x = element_text(margin = unit(c(3, 0, 0, 0), "mm"),size = 8),
+        axis.title.y = element_text(size = 8))
+
+ggplotly(target_time_ed_chart)
+
+#Save for Flourish
+target_time_ed_data %>%
+  select(.,end_date,MEASURE_VALUE,Type,timing) %>%
+  pivot_wider(
+    names_from = Type,
+    names_sep = ".",
+    values_from = MEASURE_VALUE
+  ) %>% 
+  arrange(end_date) %>% 
+  fwrite(.,paste0(onedrive_charts_data,"Fig4.csv"))
+
+```
+
+### Scotland
+
+```{r time.seen.scotland, echo=FALSE, message=FALSE, warning=FALSE,fig.width=8,fig.height=6}
+waiting_time_data <- scotland_camhs_appended %>%
+  filter(., HB=="S92000003",
+         Metric %in% c("MedianWeeksPatientsSeen",
+                          "X90thPercentileWeeksPatientsSeen"),
+         year_month>=ymd("2018-04-01")) %>%
+  mutate(., Count=as.numeric(Count))
+
+waiting_time_chart <- waiting_time_data %>%
+  ggplot(., aes(x=year_month, y=Count, group=Metric)) +
+  geom_line(aes(color=Metric, linetype=Metric),size=1) +
+  scale_x_date(date_labels = "%b %Y",date_breaks = "6 months") +
+  scale_y_continuous(labels = scales::comma) +
+  theme_ipsum() +
+  xlab("") +
+  ylab("Weeks") +
+  labs(col="") +
+  scale_color_manual(values=c("MedianWeeksPatientsSeen" = "lightsalmon",
+                              "X90thPercentileWeeksPatientsSeen" = "lightsalmon4")) +
+  scale_linetype_manual(values=c("MedianWeeksPatientsSeen" = "lightsalmon",
+                                 "X90thPercentileWeeksPatientsSeen" = "lightsalmon4")) +
+  guides(linetype = FALSE)  +
+  theme(legend.position="bottom",
+        panel.border = element_blank(),
+        strip.text = element_text(size=8),
+        text = element_text(size = 8),
+        legend.title=element_text(size=8),
+        legend.text=element_text(size=8),
+        axis.text = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.text.x = element_text(angle = 45, hjust = 1,size = 8),
+        axis.title.x = element_text(margin = unit(c(3, 0, 0, 0), "mm"),size = 8),
+        axis.title.y = element_text(size = 8))
+
+ggplotly(waiting_time_chart)
+```
+
+### Wales
+
+```{r time.seen.wales, echo=FALSE, message=FALSE, warning=FALSE,fig.width=8,fig.height=6}
+number_waiting_wales_data <- wales_camhs %>%
+  filter(str_detect(Metric, 'pct')) %>%
+  mutate(.,
+         MEASURE_VALUE=as.numeric(Count),
+         timing=ifelse(month_year<ymd("2020-04-01"),"Pre-COVID","Post-COVID")) %>%
+  mutate(.,timing=fct_relevel(timing, c("Pre-COVID","Post-COVID"))) %>% 
+  arrange(.,month_year) %>%
+  as_tibble()
+
+number_waiting_wales_chart <- number_waiting_wales_data %>%
+  ggplot(.) +
+  geom_bar(aes(x=month_year, y=MEASURE_VALUE, fill=Metric), position="fill",stat = "identity") +
+  scale_x_date(date_labels = "%b %Y",date_breaks = "3 months") +
+  scale_y_continuous(labels = scales::comma) +
+  facet_wrap(~timing, scales = "free_x") +
+  theme_ipsum() +
+  xlab("") +
+  ylab("") +
+  labs(fill="") +
+  theme(legend.position="bottom",
+        panel.border = element_blank(),
+        strip.text = element_text(size=8),
+        text = element_text(size = 8),
+        legend.title=element_text(size=8),
+        legend.text=element_text(size=8),
+        axis.text = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.text.x = element_text(angle = 45, hjust = 1,size = 8),
+        axis.title.x = element_text(margin = unit(c(3, 0, 0, 0), "mm"),size = 8),
+        axis.title.y = element_text(size = 8))
+
+ggplotly(number_waiting_wales_chart)
+```
+
+## Percentage changes compared to previous year {.tabset}
+
+### England
+
+```{r yearly.change.eng, echo=FALSE, message=FALSE, warning=FALSE,fig.width=8,fig.height=6}
+#Data
+CAMHS_yearly_changes <- MHSDS_main_pooled_dashboard %>%
+  filter(PRIMARY_LEVEL_DESCRIPTION=="England") %>%
+  filter(.,MEASURE_ID %in% c("CYP01","CYP23","MHS61a","MHS30d","MHS32a")) %>%
+  filter(.,!(MEASURE_ID=="MHS32a"&BREAKDOWN!="England")) %>% 
+  select(.,PRIMARY_LEVEL_DESCRIPTION,MEASURE_ID,MEASURE_VALUE,start_date,month_year) %>%
+  mutate(start_date=lubridate::ymd(start_date)) %>%
+  mutate(.,MEASURE_VALUE=as.numeric(MEASURE_VALUE),
+         start_date_l1=start_date-years(1),
+         MEASURE_KEY=case_when(
+           MEASURE_ID=="MHS30d" ~ "Attended contacts (<18)",
+           MEASURE_ID=="CYP01" ~ "People in contact",
+           MEASURE_ID=="CYP23" ~ "Open referrals",
+           MEASURE_ID=="MHS61a" ~ "First contacts",
+           MEASURE_ID=="MHS32a" ~ "New referrals",
+           TRUE ~ "NA"
+         ))
+
+CAMHS_people_in_contact_l1 <- CAMHS_yearly_changes %>%
+  select(.,start_date,MEASURE_VALUE,PRIMARY_LEVEL_DESCRIPTION,MEASURE_ID,MEASURE_KEY) %>%
+  rename(.,MEASURE_VALUE_l1=MEASURE_VALUE,start_date_l1=start_date)
+
+CAMHS_yearly_changes <- left_join(CAMHS_yearly_changes,
+                                          CAMHS_people_in_contact_l1,
+                                          by=c("start_date_l1","PRIMARY_LEVEL_DESCRIPTION","MEASURE_ID","MEASURE_KEY")) %>%
+  arrange(.,MEASURE_ID,start_date) %>%
+  mutate(pct_change_l1=(MEASURE_VALUE-MEASURE_VALUE_l1)/MEASURE_VALUE_l1*100) %>%
+  filter(.,!is.na(pct_change_l1)) %>%
+  mutate(timing=ifelse(start_date<ymd("2020-04-01"),"Pre-COVID","Post-COVID")) %>%
+  mutate(.,timing=fct_relevel(timing, c("Pre-COVID","Post-COVID")))
+rm(CAMHS_people_in_contact_l1)
+
+#Chart
+CAMHS_people_in_contact_chart <- CAMHS_yearly_changes %>%
+  ggplot(., aes(x=start_date, y=pct_change_l1, group= MEASURE_KEY)) +
+  facet_wrap(~timing, scales = "free_x") +
+  geom_line(aes(color= MEASURE_KEY),size=1) +
+  geom_hline(yintercept=0, linetype="dashed", color = "red") +
+  scale_x_date(date_labels = "%b %Y",date_breaks = "1 month") +
+  theme_ipsum() +
+  xlab("") +
+  ylab("% change") +
+  labs(col="") +
+  scale_color_manual(values=c("Open referrals" = "aquamarine4",
+                              "People in contact" = "tomato3",
+                              "First contacts" = "olivedrab4",
+                              "Attended contacts (<18)" = "violetred",
+                              "New referrals" = "magenta1")) +
+  theme(legend.position="bottom",
+        panel.border = element_blank(),
+        strip.text = element_text(size=8),
+        text = element_text(size = 8),
+        legend.title=element_text(size=8),
+        legend.text=element_text(size=8),
+        axis.text = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.text.x = element_text(angle = 45, hjust = 1,size = 8),
+        axis.title.x = element_text(margin = unit(c(3, 0, 0, 0), "mm"),size = 8),
+        axis.title.y = element_text(size = 8))
+
+ggplotly(CAMHS_people_in_contact_chart)
+
+#Save for Flourish
+pct_changes_data_flourish <- CAMHS_yearly_changes %>%
+  select(.,start_date,pct_change_l1,MEASURE_KEY,timing) %>%
+    mutate(.,country="England")
+```
+
+### Scotland
+
+```{r yearly.change.scot, echo=FALSE, message=FALSE, warning=FALSE,fig.width=11,fig.height=8}
+#CAMHS Scotland data
+CAMHS_Scotland_yearly_changes <- scotland_camhs_appended %>%
+  filter(HB=="S92000003",
+         Metric %in% c("OpenCases","TotalPatientsSeen",
+                       "ReferralsReceived","ReferralsAccepted","TotalPatientsWaiting")) %>%
+  select(.,HB,Metric,Count,year_month) %>%
+  mutate(start_date=lubridate::ymd(year_month)) %>%
+  mutate(.,MEASURE_VALUE=as.numeric(Count),
+         start_date_l1=start_date-years(1),
+         MEASURE_KEY=case_when(
+           Metric=="OpenCases" ~ "People in contact",
+           Metric=="ReferralsReceived" ~ "Referrals received",
+           Metric=="ReferralsAccepted" ~ "Referrals accepted",
+           Metric=="TotalPatientsWaiting" ~ "People waiting",
+           Metric=="TotalPatientsSeen" ~ "First contacts",
+           TRUE ~ "NA"
+         ))
+
+CAMHS_Scotland_yearly_changes_l1 <- CAMHS_Scotland_yearly_changes %>%
+  select(.,HB,start_date,MEASURE_VALUE,Metric,MEASURE_KEY) %>%
+  rename(.,MEASURE_VALUE_l1=MEASURE_VALUE,start_date_l1=start_date)
+
+CAMHS_Scotland_yearly_changes <- left_join(CAMHS_Scotland_yearly_changes,
+                                  CAMHS_Scotland_yearly_changes_l1,
+                                          by=c("HB","start_date_l1","Metric","MEASURE_KEY")) %>%
+  arrange(.,Metric,start_date) %>%
+  mutate(pct_change_l1=(MEASURE_VALUE-MEASURE_VALUE_l1)/MEASURE_VALUE_l1*100) %>%
+  filter(.,!is.na(pct_change_l1)) %>%
+  mutate(timing=ifelse(start_date<ymd("2020-04-01"),"Pre-COVID","Post-COVID")) %>%
+  mutate(.,timing=fct_relevel(timing, c("Pre-COVID","Post-COVID")))
+rm(CAMHS_Scotland_yearly_changes_l1)
+
+#CAMHS Scotland chart
+CAMHS_Scotland_yearly_changes_chart <- CAMHS_Scotland_yearly_changes %>%
+  filter(start_date>=ymd("2018-04-01")) %>% 
+  ggplot(., aes(x=start_date, y=pct_change_l1, group= MEASURE_KEY)) +
+  facet_wrap(~timing, scales = "free_x") +
+  geom_line(aes(color= MEASURE_KEY),size=1) +
+  geom_hline(yintercept=0, linetype="dashed", color = "red") +
+  scale_x_date(date_labels = "%b %Y",date_breaks = "1 month") +
+  theme_ipsum() +
+  xlab("") +
+  ylab("% change") +
+  labs(col="") +
+  theme(legend.position="bottom",
+        panel.border = element_blank(),
+        strip.text = element_text(size=8),
+        text = element_text(size = 8),
+        legend.title=element_text(size=8),
+        legend.text=element_text(size=8),
+        axis.text = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.text.x = element_text(angle = 45, hjust = 1,size = 8),
+        axis.title.x = element_text(margin = unit(c(3, 0, 0, 0), "mm"),size = 8),
+        axis.title.y = element_text(size = 8))
+
+ggplotly(CAMHS_Scotland_yearly_changes_chart) %>% 
+  layout(legend = list(orientation = 'h'))
+
+#Save for Flourish
+pct_changes_data_flourish <- CAMHS_Scotland_yearly_changes %>%
+  select(.,start_date,pct_change_l1,MEASURE_KEY,timing) %>%
+  mutate(.,country="Scotland") %>%
+  plyr::rbind.fill(.,pct_changes_data_flourish) %>% 
+  pivot_wider(
+    names_from = MEASURE_KEY,
+    names_sep = ".",
+    values_from = pct_change_l1
+  ) %>%
+  filter(.,start_date>=ymd("2020-01-01"),
+         country=="England")
+fwrite(pct_changes_data_flourish,paste0(onedrive_charts_data,"Fig2.csv"))
+```
+
+## Service demand vs. workforce {.tabset}
+
+<!-- KEY FACTS -->
+
+<!-- - We compared the number of people in contact with CAMHS to the number of NHS staff working in the service. For CAMHS, we only have data on the number of child and adolescent psychiatrists. We don't know how many nurses or other staff members work for the child and and adolescent service, but we do have these figures for mental health nurses in general. -->
+<!-- - The number of people in contact with CAMHS has been growing compared to pre-pandemic levels (climbing steadily to 50% higher in July 2020) [not seasonally adjusted]. The number of child and adolescent psychiatrists has only increased by 7%. -->
+<!-- - We don't know how many more nurses are working with children and adolescents, but elsewhere in the service the number of mental health nurses has also increased by about 7%. -->
+<!-- - This is resulting in a situation where waiting lists are getting bigger, people are waiting longer and, potentially, people are being kept out of the waiting list in the first place. -->
+
+### England (NHS staff, comparison to pre-pandemic levels)
+
+```{r workforce.england, echo=FALSE, message=FALSE, warning=FALSE,fig.width=12,fig.height=8}
+############## CAMHS activity level
+
+CAMHS_contacts <- MHSDS_main_pooled_dashboard %>%
+  filter(.,PRIMARY_LEVEL_DESCRIPTION=="England",
+         MEASURE_ID=="CYP01") %>%
+  select(.,start_date,MEASURE_VALUE) %>%
+  mutate(.,date_ymd=lubridate::ymd(start_date)) %>%
+  mutate(.,date_ymd=floor_date(date_ymd, "month"),
+         measure="People in contact CAMHS",
+         MEASURE_VALUE=as.numeric(MEASURE_VALUE)) %>%
+  select(.,-"start_date") %>%
+  arrange(.,date_ymd)
+
+#Pct change between Jan 2010 and April 2021
+CAMHS_contacts %>%
+  mutate(.,MEASURE_VALUE_MA=zoo::rollmean(MEASURE_VALUE,k=7,fill=NA)) %>%
+  select(.,-"MEASURE_VALUE") %>%
+  filter(date_ymd %in% c(ymd("2021-04-01"),ymd("2019-01-01"))) %>%
+  pivot_wider(
+    names_from = date_ymd,
+    names_sep = ".",
+    values_from = c(MEASURE_VALUE_MA)
+  ) %>%
+  mutate(.,pct_change=(`2021-04-01`-`2019-01-01`)/`2019-01-01`*100) %>%
+  knitr::kable(., align = "lccrr")
+
+############## Consultants chart
+
+mh_nurses_data <- NHS_workforce_other %>%
+  mutate(.,date_ymd=lubridate::ymd(Date)) %>%
+  mutate(.,date_ymd=floor_date(date_ymd, "month"),
+         measure="FTE nurses") %>%
+  rename(.,MEASURE_VALUE=`Total FTE`,
+         `Specialty`=`Staff Group 2`) %>%
+  filter(`Specialty` %in% c("010_Nurses - mental health")) %>%
+  mutate(`Specialty`=ifelse(`Specialty`=="010_Nurses - mental health","Mental health",`Specialty`)) %>% 
+  group_by(date_ymd,measure,`Specialty`) %>%
+  summarise(MEASURE_VALUE=sum(MEASURE_VALUE,na.rm=TRUE)) %>% 
+  ungroup()
+
+psych_doctors_data <- NHS_workforce_doctors %>%
+  mutate(.,date_ymd=lubridate::ymd(Date)) %>%
+  mutate(.,date_ymd=floor_date(date_ymd, "month"),
+         measure="FTE doctors") %>%
+  rename(.,MEASURE_VALUE=FTE) %>%
+  filter(Specialty %in% c("Child and adolescent psychiatry",
+                          "General psychiatry")) %>%
+  group_by(date_ymd,measure,`Specialty Group`,Specialty) %>%
+  summarise(MEASURE_VALUE=sum(MEASURE_VALUE,na.rm=TRUE)) %>% 
+  ungroup()
+
+mh_all_staff_data <- mh_nurses_data %>%
+  bind_rows(.,psych_doctors_data) %>% 
+  bind_rows(.,CAMHS_contacts)
+
+# %>% mutate(.,date_ymd_l1=date_ymd-years(1))
+
+# mh_all_staff_data_l1 <- mh_all_staff_data %>%
+#   select(.,date_ymd,measure,`Specialty Group`,Specialty,MEASURE_VALUE) %>%
+#   rename(.,MEASURE_VALUE_l1=MEASURE_VALUE,date_ymd_l1=date_ymd)
+
+mh_all_staff_data <- mh_all_staff_data %>%
+  mutate(.,fy_precovid=ifelse(date_ymd>=ymd("2019-03-01")&
+                                date_ymd<=ymd("2020-02-01"),1,0)) %>%
+  mutate(.,date_post_covid=ifelse(fy_precovid==0,date_ymd,"pre-COVID")) %>%
+  mutate(.,group_for_base_chart=paste(measure,`Specialty Group`,`Specialty`,
+                                      fy_precovid,date_post_covid))
+
+#rm(mh_all_staff_data_l1)
+# left_join(mh_all_staff_data,mh_all_staff_data_l1,
+#           by=c("date_ymd_l1","measure","Specialty Group","Specialty")) %>%
+#   arrange(.,Specialty,date_ymd) %>%
+#   mutate(pct_change_l1=(MEASURE_VALUE-MEASURE_VALUE_l1)/MEASURE_VALUE_l1*100)
+
+############## Level 100 chart
+
+base100_data <- mh_all_staff_data %>%
+  filter(date_ymd>=ymd("2019-03-01")) %>% 
+  group_by(group_for_base_chart) %>%
+  mutate(.,MEASURE_VALUE_avg=mean(MEASURE_VALUE,na.rm=TRUE)) %>%
+  mutate(.,pre_value=as.numeric(ifelse(fy_precovid==1,MEASURE_VALUE_avg,NA))) %>%
+  ungroup() %>%
+  group_by(measure,Specialty) %>%
+  mutate(.,pre_value=LOCF(pre_value)) %>%
+  mutate(value_base100=MEASURE_VALUE_avg/pre_value*100) %>% 
+  ungroup() %>%
+  filter(date_ymd>=ymd("2020-02-01"))
+
+base100_chart <- base100_data %>%
+  mutate(chart_group=paste(measure,Specialty,sep=" ")) %>%
+  mutate(chart_group=str_replace_all(chart_group," NA","")) %>% 
+  ggplot(., aes(x=date_ymd, y=value_base100, group=chart_group)) +
+  geom_line(aes(color=chart_group),size=1.5) +
+  scale_x_date(date_labels = "%b %Y",date_breaks = "3 months") +
+  scale_y_continuous(labels = scales::comma) +
+  theme_ipsum() +
+  xlab("") +
+  ylab("Activity") +
+  labs(col="",
+       title = "Mental health services for children and young people", 
+       subtitle = "Comparison to pre-COVID levels", 
+       caption = "100 = average activity in year before March 2020") +
+  scale_color_brewer(palette = "Set1") +
+  theme(legend.position="right",
+        panel.border = element_blank(),
+        strip.text = element_text(size=12),
+        text = element_text(size = 12),
+        legend.title=element_text(size=12),
+        legend.text=element_text(size=12),
+        axis.text = element_text(size = 12),
+        axis.text.y = element_text(size = 12),
+        axis.text.x = element_text(angle = 45, hjust = 1,size = 12),
+        axis.title.x = element_text(margin = unit(c(3, 0, 0, 0), "mm"),size = 12),
+        axis.title.y = element_text(size = 12))
+
+ggplotly(base100_chart) %>%
+  layout(autosize = T,
+         annotations = 
+           list(x = 1, y = -0.1, text = "100 = average level in year pre-COVID", 
+                showarrow = F, xref='paper', yref='paper', 
+                xanchor='right', yanchor='auto', xshift=0, yshift=0,
+                font=list(size=15, color="black")))
+
+##############  Save for Flourish
+base100_data %>%
+  mutate(chart_group=paste(measure,Specialty,sep=" ")) %>%
+  mutate(chart_group=str_replace_all(chart_group," NA","")) %>%
+  select(.,date_ymd,value_base100,chart_group) %>%
+  pivot_wider(
+    names_from = chart_group,
+    names_sep = ".",
+    values_from = value_base100
+  ) %>% 
+  fwrite(.,paste0(onedrive_charts_data,"Fig3.csv"))
+
+```
+
+### England (HEE, comparison to Jan 2019)
+
+```{r workforce.england.bis, echo=FALSE, message=FALSE, warning=FALSE,fig.width=12,fig.height=8}
+
+#HEE data
+CAMHS_contacts_index <- CAMHS_contacts %>%
+  mutate(.,MEASURE_VALUE_MA=zoo::rollmean(MEASURE_VALUE,k=7,fill=NA)) %>%
+  mutate(.,Jan2019=filter(.,date_ymd=="2019-01-01")$MEASURE_VALUE_MA) %>%
+  filter(.,date_ymd>=ymd("2019-01-01"),!is.na(MEASURE_VALUE_MA)) %>%
+  mutate(.,index=MEASURE_VALUE_MA/Jan2019*100)
+
+HEE_staff_index <- data.frame(measure="CYP MH staff",
+  date_ymd=as.Date(c("2019-01-01","2021-04-01")),
+  MEASURE_VALUE=as.numeric(c("14857","20626"))) %>%
+  mutate(.,Jan2019=filter(.,date_ymd=="2019-01-01")$MEASURE_VALUE) %>%
+  mutate(.,index=MEASURE_VALUE/Jan2019*100)
+
+CAMHS_and_HEE_staff <- plyr::rbind.fill(CAMHS_contacts_index,HEE_staff_index)
+
+CAMHS_and_HEE_staff %>%
+  knitr::kable(., align = "lccrr")
+
+CAMHS_and_HEE_staff %>%
+  select(.,date_ymd,measure,index) %>%
+  pivot_wider(
+    names_from = measure,
+    names_sep = ".",
+    values_from = index
+  ) %>% 
+  fwrite(.,paste0(onedrive_charts_data,"Fig3b.csv"))
+
+#NHS data
+NHS_workforce_doctors %>%
+  mutate(.,date_ymd=lubridate::ymd(Date)) %>%
+  mutate(.,date_ymd=floor_date(date_ymd, "month"),
+         measure="FTE doctors") %>%
+  rename(.,MEASURE_VALUE=FTE) %>%
+  filter(Specialty %in% c("Child and adolescent psychiatry")) %>%
+  group_by(date_ymd,measure,Specialty) %>%
+  summarise(MEASURE_VALUE=sum(MEASURE_VALUE,na.rm=TRUE)) %>% 
+  ungroup() %>%
+  filter(., date_ymd %in% c(ymd("2019-01-01"),ymd("2021-04-01"))) %>%
+  pivot_wider(
+    names_from = date_ymd,
+    names_sep = ".",
+    values_from = MEASURE_VALUE
+  ) %>%
+  mutate(.,pct_change=(`2021-04-01`-`2019-01-01`)/`2019-01-01`*100) %>%
+  knitr::kable(., align = "lccrr")
+```
