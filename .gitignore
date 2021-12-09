@@ -1,3 +1,6 @@
+# Archive folder
+/Archive/*.*
+
 #Dashboard data files
 /Clean data for dashboard/*.*
 /rsconnect/*.*
