@@ -28,7 +28,7 @@ Run the Rmarkdown file included in the 'Static analysis' folder to reproduce our
 
 ## Useful references
 
-- MHSDS metadata](https://digital.nhs.uk/data-and-information/data-collections-and-data-sets/data-sets/mental-health-services-data-set/statistics-and-reports)
+- [MHSDS metadata](https://digital.nhs.uk/data-and-information/data-collections-and-data-sets/data-sets/mental-health-services-data-set/statistics-and-reports)
 
 ## Authors
 
