@@ -1,3 +1,5 @@
+<img src="ndlbanner.png" width="405" height="96">
+
 # Analysis of Mental Health Services Dataset by the Networked Data Lab
 
 #### Project Status: [In progress]
