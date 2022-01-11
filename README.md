@@ -34,7 +34,7 @@ Run the Rmarkdown file included in the 'Static analysis' folder to reproduce our
 
 ## Authors
 
-* Sebastien Peytrigent [Twitter](https://twitter.com/SebastienPeytr2) - [GitHub](https://github.com/sg-peytrignet/)
+* Sebastien Peytrignet [Twitter](https://twitter.com/SebastienPeytr2) - [GitHub](https://github.com/sg-peytrignet/)
 
 ## License
 
