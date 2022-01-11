@@ -1,3 +1,34 @@
-1.
-2.
-3.
+The link to our upcoming publication (draft) can be found here: https://thehealthfoundation98.sharepoint.com/:w:/s/thf_project/projects_programmes/00223/EWYCCExTgZNEv2jc64DZtP8BosRe_mmelDUCIrOun0POrA?e=eGEFes - this is due to be published in early February.
+
+The analysis in this report draws from 4 main sources: 
+
+- NHS Digital's Mental Health and Young People Survey (MHCYP)
+- NHS Digital's  Mental Health Services Monthly Statistics (MHSDS)
+- Health Education England's (HEE) Children and Young People’s Mental Health Services Workforce Report
+- NHS Digital's workforce statistics
+
+We have provided three documents that summarise how we arrived to each of the findings in this report, to help with the review and quality assurance process.
+
+*** FILE 1. MH-services-long-chart\QA documents\Survey results in long chart.xlsx
+
+This summarises the findings that we reported from the Mental Health and Young People Survey (MHCYP). The first sheet shows the headline statistics, and the following sheets are copied over from the data releases.
+
+LINK TO ORIGINAL DATA
+https://digital.nhs.uk/data-and-information/publications/statistical/mental-health-of-children-and-young-people-in-england/2021-follow-up-to-the-2017-survey
+
+*** FILE 2. MH-services-long-chart\QA documents\QA-markdown.html
+
+This Rmarkdown file shows how we used the monthly MHSDS data releases to compute our findings on trends in service use. At the end, it also shows how we used the data from Health Education England and NHS Digital's workforce statistics. All the figures reported in the long chart can be found in the markdown.
+
+LINKS TO ORIGINAL DATA
+https://digital.nhs.uk/data-and-information/publications/statistical/mental-health-services-monthly-statistics
+https://www.hee.nhs.uk/sites/default/files/documents/National%20HEE%20Children%20Young%20People%20Mental%20Health%20Service%20Report%20-%20Final%20%282.11.2021%29.pdf
+https://digital.nhs.uk/data-and-information/publications/statistical/nhs-workforce-statistics
+
+*** FILE 3. MH-services-long-chart\QA documents\Waiting time statistics for FY 201920.xlsx
+
+This file shows how we computed statistics on waiting times from an one-off output from NHS Digital on CAMHS waiting times.
+
+LINK TO ORIGINAL DATA
+https://digital.nhs.uk/data-and-information/find-data-and-publications/supplementary-information/2019-supplementary-information-files/waiting-times-for-children-and-young-peoples-mental-health-services-2018---2019-additional-statistics
+
