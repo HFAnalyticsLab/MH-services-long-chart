@@ -35,10 +35,10 @@ clean_data_dir <- "M:/Analytics/Sebastien/GitHub/MHSDS-pipeline/Clean data for d
 #Load main performance data
 MHSDS_main_pooled_dashboard <- fread(paste0(clean_data_dir,"MHSDS_main_pooled.csv"),header=TRUE, sep=",", check.names=T)
 
-#Load ED data
+#Load eating disorder data
 MHSDS_ED_pooled_dashboard <- fread(paste0(clean_data_dir,"MHSDS_ED_pooled.csv"),header=TRUE, sep=",", check.names=T)
 
-#Load additional data on waiting times
+#Load additional data on waiting times (one-off data release for financial year 2019/20)
 MHSDS_wait_times <- read_excel(paste0(clean_data_dir,"additional_cyp_wait_times_1920.xlsx"), sheet = "1b",skip=17)
 
 #Load Scotland data
@@ -47,11 +47,11 @@ scotland_camhs_appended <- fread(paste0(clean_data_dir,"scotland_camhs_appended.
 #Load Wales data
 wales_camhs <- fread(paste0(clean_data_dir,"wales_camhs.csv"),header=TRUE, sep=",", check.names=T)
 
-#Load workforce data
+#Load workforce data (consultants)
 NHS_workforce_doctors <- read_excel(
   paste0(clean_data_dir,"NHS workforce statistics - data.xlsx"))
 
-#Load workforce data
+#Load workforce data (other)
 NHS_workforce_other <- read_excel(
   paste0(clean_data_dir,"NHS workforce statistics - other - data.xlsx"))
 ```
@@ -239,6 +239,16 @@ ggplotly(CAMHS_contacts_chart)
 levels_data_flourish <- CAMHS_contacts_data %>%
   select(.,start_date,MEASURE_VALUE,MEASURE_KEY,timing) %>%
   mutate(country="England")
+
+#Average per calendar year
+CAMHS_contacts_data %>%
+  mutate(.,year=lubridate::year(start_date)) %>% 
+  group_by(MEASURE_ID,MEASURE_KEY,year) %>%
+  summarise(average=mean(MEASURE_VALUE,na.rm = TRUE),
+            months_included= n()) %>% 
+  ungroup() %>%
+  filter(.,months_included==12) %>%
+  knitr::kable(., align = "lccrr")
 ```
 
 ### Scotland

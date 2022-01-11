@@ -1,0 +1,736 @@
+---
+title: "Networked Data Lab long chart on children and young people's mental health"
+author: "Sebastien Peytrignet"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+#Clean up the global environment
+rm(list = ls())
+
+#Load packages
+library("tidyverse")
+library("lubridate")
+library("here")
+library("data.table")
+library("plotly")
+library("hrbrthemes")
+library("readxl")
+library("DescTools")
+
+#File locations
+onedrive_charts_data <- "C:/Users/SebastienP/OneDrive - The Health Foundation/NDL Topic 2/Data for flourish charts/"
+clean_data_dir <- "M:/Analytics/CYP MH/Data for NDL long chart/"
+
+#Load main performance data
+MHSDS_main_pooled_dashboard <- fread(paste0(clean_data_dir,"MHSDS_main_pooled.csv"),header=TRUE, sep=",", check.names=T)
+
+#Load eating disorder data
+MHSDS_ED_pooled_dashboard <- fread(paste0(clean_data_dir,"MHSDS_ED_pooled.csv"),header=TRUE, sep=",", check.names=T)
+
+#Load additional data on waiting times (one-off data release for financial year 2019/20)
+MHSDS_wait_times <- read_excel(paste0(clean_data_dir,"additional_cyp_wait_times_1920.xlsx"), sheet = "1b",skip=17)
+
+#Load workforce data (consultants)
+NHS_workforce_doctors <- read_excel(
+  paste0(clean_data_dir,"NHS workforce statistics - data.xlsx"))
+
+#Load workforce data (other)
+NHS_workforce_other <- read_excel(
+  paste0(clean_data_dir,"NHS workforce statistics - other - data.xlsx"))
+```
+
+```{r MHSDS.data, echo=TRUE, message=FALSE, warning=FALSE}
+#Subsample of metrics from MHSDS data
+CAMHS_data <- MHSDS_main_pooled_dashboard %>%
+  filter(PRIMARY_LEVEL_DESCRIPTION=="England",
+         MEASURE_ID %in% c("CYP01","MHS61a","CYP23","MHS30d","MHS32a")) %>%
+  filter(.,!(MEASURE_ID=="MHS32a"&BREAKDOWN!="England")) %>% 
+  mutate(MEASURE_KEY=case_when(
+           MEASURE_ID=="MHS30d" ~ "Attended contacts (<18)",
+           MEASURE_ID=="CYP01" ~ "People in contact",
+           MEASURE_ID=="MHS61a" ~ "First contacts (<18)",
+           MEASURE_ID=="CYP23" ~ "Open referrals",
+           MEASURE_ID=="MHS32a" ~ "New referrals (<18)",
+           TRUE ~ "NA"
+         )) %>% 
+  select(.,start_date,end_date,month_year,PRIMARY_LEVEL_DESCRIPTION,MEASURE_ID,MEASURE_KEY,MEASURE_VALUE) %>% 
+  mutate(.,MEASURE_VALUE=as.numeric(MEASURE_VALUE),
+         timing=ifelse(start_date<ymd("2020-04-01"),"Pre-COVID","Post-COVID")) %>%
+  mutate(.,timing=fct_relevel(timing, c("Pre-COVID","Post-COVID"))) %>% 
+  arrange(.,start_date) %>%
+  as_tibble()
+
+#Percentage change compared to a year ago
+#For example, for March 2020 show the % change between March 2019 and March 2020
+
+CAMHS_yearly_changes <- CAMHS_data %>%
+  select(.,PRIMARY_LEVEL_DESCRIPTION,MEASURE_ID,MEASURE_KEY,MEASURE_VALUE,start_date,month_year,timing) %>%
+  mutate(start_date=lubridate::ymd(start_date)) %>%
+  mutate(.,start_date_l1=start_date-years(1)) #Adds a new column with the month a year before
+
+#Auxiliary dataset with data points from a year before
+CAMHS_data_l1 <- CAMHS_yearly_changes %>%
+  select(.,start_date,MEASURE_VALUE,PRIMARY_LEVEL_DESCRIPTION,MEASURE_ID,MEASURE_KEY) %>%
+  rename(.,MEASURE_VALUE_l1=MEASURE_VALUE,start_date_l1=start_date)
+
+#Merge auxiliary data back in
+CAMHS_yearly_changes <- left_join(CAMHS_yearly_changes,
+                                          CAMHS_data_l1,
+                                          by=c("start_date_l1","PRIMARY_LEVEL_DESCRIPTION","MEASURE_ID","MEASURE_KEY")) %>%
+  arrange(.,MEASURE_ID,start_date) %>%
+  mutate(pct_change_l1=(MEASURE_VALUE-MEASURE_VALUE_l1)/MEASURE_VALUE_l1*100) %>%
+  filter(.,!is.na(pct_change_l1))
+rm(CAMHS_data_l1)
+```
+
+## People in contact with CAMHS {.tabset}
+
+- **Measure code:** CYP01
+- **Measure description:** People in contact with children and young people's mental health services at the end of the reporting period
+- **Source:** NHS England, Monthly MHSDS Statistics, [Metadata](https://nhs-prod.global.ssl.fastly.net/binaries/content/assets/website-assets/data-and-information/data-sets/mhsds/mhsds-monthly-metadata-1.xlsx)
+
+### Raw time series
+
+```{r cyp01.raw.time.series, echo=TRUE, message=FALSE, warning=FALSE}
+#Data
+CAMHS_data_cyp01 <- CAMHS_data %>%
+  filter(.,MEASURE_ID=="CYP01")
+CAMHS_reldata_cyp01 <- CAMHS_yearly_changes %>%
+  filter(.,MEASURE_ID=="CYP01")
+
+#Time series chart
+CAMHS_raw_chart_cyp01 <- CAMHS_data_cyp01 %>% 
+  ggplot(., aes(x=start_date, y=MEASURE_VALUE, group= MEASURE_KEY)) +
+  geom_line(aes(color= MEASURE_KEY),
+            size=1) +
+  scale_x_date(date_labels = "%b %Y",date_breaks = "3 months") +
+  scale_y_continuous(labels = scales::comma) +
+  facet_wrap(~timing, scales = "free_x") +
+  theme_ipsum() +
+  xlab("") +
+  ylab("") +
+  labs(col="") +
+  scale_color_brewer(palette = "Set1") +
+  theme(legend.position="bottom",
+        panel.border = element_blank(),
+        strip.text = element_text(size=8),
+        text = element_text(size = 8),
+        legend.title=element_text(size=8),
+        legend.text=element_text(size=8),
+        axis.text = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.text.x = element_text(angle = 45, hjust = 1,size = 8),
+        axis.title.x = element_text(margin = unit(c(3, 0, 0, 0), "mm"),size = 8),
+        axis.title.y = element_text(size = 8))
+  
+ggplotly(CAMHS_raw_chart_cyp01)
+
+#Underlying data
+CAMHS_data_cyp01 %>%
+  select(.,start_date,MEASURE_KEY,MEASURE_VALUE) %>%
+  arrange(.,start_date) %>% 
+  knitr::kable(., align = "lccrr",format.args = list(big.mark = ","))
+```
+
+### Monthly average, per year
+
+```{r cyp01.avg, echo=TRUE, message=FALSE, warning=FALSE}
+#Average per calendar year
+CAMHS_data_cyp01 %>%
+  mutate(.,year=lubridate::year(start_date)) %>% 
+  group_by(MEASURE_ID,MEASURE_KEY,year) %>%
+  summarise(average=mean(MEASURE_VALUE,na.rm = TRUE),
+            months_included= n()) %>% 
+  ungroup() %>%
+  filter(.,months_included==12) %>%
+  knitr::kable(., align = "lccrr")
+```
+
+### Relative changes compared to last year
+
+```{r cyp01.rel.changes, echo=TRUE, message=FALSE, warning=FALSE}
+#Relative changes chart
+CAMHS_changes_chart_cyp01 <- CAMHS_reldata_cyp01 %>%
+  ggplot(., aes(x=start_date, y=pct_change_l1, group= MEASURE_KEY)) +
+  facet_wrap(~timing, scales = "free_x") +
+  geom_line(aes(color= MEASURE_KEY),size=1) +
+  geom_hline(yintercept=0, linetype="dashed", color = "red") +
+  scale_x_date(date_labels = "%b %Y",date_breaks = "1 month") +
+  theme_ipsum() +
+  xlab("") +
+  ylab("% change") +
+  labs(col="") +
+  scale_color_manual(values=c("Open referrals" = "aquamarine4",
+                              "People in contact" = "tomato3",
+                              "First contactsn (<18)" = "olivedrab4",
+                              "Attended contacts (<18)" = "violetred",
+                              "New referrals (<18)" = "magenta1")) +
+  theme(legend.position="bottom",
+        panel.border = element_blank(),
+        strip.text = element_text(size=8),
+        text = element_text(size = 8),
+        legend.title=element_text(size=8),
+        legend.text=element_text(size=8),
+        axis.text = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.text.x = element_text(angle = 45, hjust = 1,size = 8),
+        axis.title.x = element_text(margin = unit(c(3, 0, 0, 0), "mm"),size = 8),
+        axis.title.y = element_text(size = 8))
+
+ggplotly(CAMHS_changes_chart_cyp01)
+
+#Underlying data
+CAMHS_reldata_cyp01 %>%
+  select(.,start_date,MEASURE_KEY,pct_change_l1) %>%
+  arrange(.,start_date) %>% 
+  knitr::kable(., align = "lccrr",format.args = list(big.mark = ","))
+```
+
+## New referrals (<18) {.tabset}
+
+- **Measure code:** MHS32a
+- **Measure description:** Referrals starting in RP, aged 0-18
+- **Source:** NHS England, Monthly MHSDS Statistics, [Metadata](https://nhs-prod.global.ssl.fastly.net/binaries/content/assets/website-assets/data-and-information/data-sets/mhsds/mhsds-monthly-metadata-1.xlsx)
+
+### Raw time series
+
+```{r cyp32a.raw.time.series, echo=TRUE, message=FALSE, warning=FALSE}
+#Data
+CAMHS_data_cyp32a <- CAMHS_data %>%
+  filter(.,MEASURE_ID=="MHS32a")
+CAMHS_reldata_cyp32a <- CAMHS_yearly_changes %>%
+  filter(.,MEASURE_ID=="MHS32a")
+
+#Time series chart
+CAMHS_raw_chart_cyp32a <- CAMHS_data_cyp32a %>% 
+  ggplot(., aes(x=start_date, y=MEASURE_VALUE, group= MEASURE_KEY)) +
+  geom_line(aes(color= MEASURE_KEY),
+            size=1) +
+  scale_x_date(date_labels = "%b %Y",date_breaks = "3 months") +
+  scale_y_continuous(labels = scales::comma) +
+  facet_wrap(~timing, scales = "free_x") +
+  theme_ipsum() +
+  xlab("") +
+  ylab("") +
+  labs(col="") +
+  scale_color_brewer(palette = "Set1") +
+  theme(legend.position="bottom",
+        panel.border = element_blank(),
+        strip.text = element_text(size=8),
+        text = element_text(size = 8),
+        legend.title=element_text(size=8),
+        legend.text=element_text(size=8),
+        axis.text = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.text.x = element_text(angle = 45, hjust = 1,size = 8),
+        axis.title.x = element_text(margin = unit(c(3, 0, 0, 0), "mm"),size = 8),
+        axis.title.y = element_text(size = 8))
+  
+ggplotly(CAMHS_raw_chart_cyp32a)
+
+#Underlying data
+CAMHS_data_cyp32a %>%
+  select(.,start_date,MEASURE_KEY,MEASURE_VALUE) %>%
+  arrange(.,start_date) %>% 
+  knitr::kable(., align = "lccrr",format.args = list(big.mark = ","))
+```
+
+### Monthly average, per year
+
+```{r cyp32a.avg, echo=TRUE, message=FALSE, warning=FALSE}
+#Average per calendar year
+CAMHS_data_cyp32a %>%
+  mutate(.,year=lubridate::year(start_date)) %>% 
+  group_by(MEASURE_ID,MEASURE_KEY,year) %>%
+  summarise(average=mean(MEASURE_VALUE,na.rm = TRUE),
+            months_included= n()) %>% 
+  ungroup() %>%
+  filter(.,months_included==12) %>%
+  knitr::kable(., align = "lccrr")
+```
+
+### Relative changes compared to last year
+
+```{r cyp32a.rel.changes, echo=TRUE, message=FALSE, warning=FALSE}
+#Relative changes chart
+CAMHS_changes_chart_cyp32a <- CAMHS_reldata_cyp32a %>%
+  ggplot(., aes(x=start_date, y=pct_change_l1, group= MEASURE_KEY)) +
+  facet_wrap(~timing, scales = "free_x") +
+  geom_line(aes(color= MEASURE_KEY),size=1) +
+  geom_hline(yintercept=0, linetype="dashed", color = "red") +
+  scale_x_date(date_labels = "%b %Y",date_breaks = "1 month") +
+  theme_ipsum() +
+  xlab("") +
+  ylab("% change") +
+  labs(col="") +
+  scale_color_manual(values=c("Open referrals" = "aquamarine4",
+                              "People in contact" = "tomato3",
+                              "First contacts (<18)" = "olivedrab4",
+                              "Attended contacts (<18)" = "violetred",
+                              "New referrals (<18)" = "magenta1")) +
+  theme(legend.position="bottom",
+        panel.border = element_blank(),
+        strip.text = element_text(size=8),
+        text = element_text(size = 8),
+        legend.title=element_text(size=8),
+        legend.text=element_text(size=8),
+        axis.text = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.text.x = element_text(angle = 45, hjust = 1,size = 8),
+        axis.title.x = element_text(margin = unit(c(3, 0, 0, 0), "mm"),size = 8),
+        axis.title.y = element_text(size = 8))
+
+ggplotly(CAMHS_changes_chart_cyp32a)
+
+#Underlying data
+CAMHS_reldata_cyp32a %>%
+  select(.,start_date,MEASURE_KEY,pct_change_l1) %>%
+  arrange(.,start_date) %>% 
+  knitr::kable(., align = "lccrr",format.args = list(big.mark = ","))
+```
+
+## First contacts (<18) {.tabset}
+
+- **Measure code:** MHS61a
+- **Measure description:** First attended contacts for referrals open in the RP, aged 0-18
+- **Source:** NHS England, Monthly MHSDS Statistics, [Metadata](https://nhs-prod.global.ssl.fastly.net/binaries/content/assets/website-assets/data-and-information/data-sets/mhsds/mhsds-monthly-metadata-1.xlsx)
+
+### Raw time series
+
+```{r cyp61a.raw.time.series, echo=TRUE, message=FALSE, warning=FALSE}
+#Data
+CAMHS_data_cyp61a <- CAMHS_data %>%
+  filter(.,MEASURE_ID=="MHS61a")
+CAMHS_reldata_cyp61a <- CAMHS_yearly_changes %>%
+  filter(.,MEASURE_ID=="MHS61a")
+
+#Time series chart
+CAMHS_raw_chart_cyp61a <- CAMHS_data_cyp61a %>% 
+  ggplot(., aes(x=start_date, y=MEASURE_VALUE, group= MEASURE_KEY)) +
+  geom_line(aes(color= MEASURE_KEY),
+            size=1) +
+  scale_x_date(date_labels = "%b %Y",date_breaks = "3 months") +
+  scale_y_continuous(labels = scales::comma) +
+  facet_wrap(~timing, scales = "free_x") +
+  theme_ipsum() +
+  xlab("") +
+  ylab("") +
+  labs(col="") +
+  scale_color_brewer(palette = "Set1") +
+  theme(legend.position="bottom",
+        panel.border = element_blank(),
+        strip.text = element_text(size=8),
+        text = element_text(size = 8),
+        legend.title=element_text(size=8),
+        legend.text=element_text(size=8),
+        axis.text = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.text.x = element_text(angle = 45, hjust = 1,size = 8),
+        axis.title.x = element_text(margin = unit(c(3, 0, 0, 0), "mm"),size = 8),
+        axis.title.y = element_text(size = 8))
+  
+ggplotly(CAMHS_raw_chart_cyp61a)
+
+#Underlying data
+CAMHS_data_cyp61a %>%
+  select(.,start_date,MEASURE_KEY,MEASURE_VALUE) %>%
+  arrange(.,start_date) %>% 
+  knitr::kable(., align = "lccrr",format.args = list(big.mark = ","))
+```
+
+### Monthly average, per year
+
+```{r cyp61a.avg, echo=TRUE, message=FALSE, warning=FALSE}
+#Average per calendar year
+CAMHS_data_cyp61a %>%
+  mutate(.,year=lubridate::year(start_date)) %>% 
+  group_by(MEASURE_ID,MEASURE_KEY,year) %>%
+  summarise(average=mean(MEASURE_VALUE,na.rm = TRUE),
+            months_included= n()) %>% 
+  ungroup() %>%
+  filter(.,months_included==12) %>%
+  knitr::kable(., align = "lccrr")
+```
+
+### Relative changes compared to last year
+
+```{r cyp61a.rel.changes, echo=TRUE, message=FALSE, warning=FALSE}
+#Relative changes chart
+CAMHS_changes_chart_cyp61a <- CAMHS_reldata_cyp61a %>%
+  ggplot(., aes(x=start_date, y=pct_change_l1, group= MEASURE_KEY)) +
+  facet_wrap(~timing, scales = "free_x") +
+  geom_line(aes(color= MEASURE_KEY),size=1) +
+  geom_hline(yintercept=0, linetype="dashed", color = "red") +
+  scale_x_date(date_labels = "%b %Y",date_breaks = "1 month") +
+  theme_ipsum() +
+  xlab("") +
+  ylab("% change") +
+  labs(col="") +
+  scale_color_manual(values=c("Open referrals" = "aquamarine4",
+                              "People in contact" = "tomato3",
+                              "First contacts (<18)" = "olivedrab4",
+                              "Attended contacts (<18)" = "violetred",
+                              "New referrals (<18)" = "magenta1")) +
+  theme(legend.position="bottom",
+        panel.border = element_blank(),
+        strip.text = element_text(size=8),
+        text = element_text(size = 8),
+        legend.title=element_text(size=8),
+        legend.text=element_text(size=8),
+        axis.text = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.text.x = element_text(angle = 45, hjust = 1,size = 8),
+        axis.title.x = element_text(margin = unit(c(3, 0, 0, 0), "mm"),size = 8),
+        axis.title.y = element_text(size = 8))
+
+ggplotly(CAMHS_changes_chart_cyp61a)
+
+#Underlying data
+CAMHS_reldata_cyp61a %>%
+  select(.,start_date,MEASURE_KEY,pct_change_l1) %>%
+  arrange(.,start_date) %>% 
+  knitr::kable(., align = "lccrr",format.args = list(big.mark = ","))
+```
+
+## Attended contacts (<18) {.tabset}
+
+- **Measure code:** MHS30d
+- **Measure description:** Attended contacts in the RP, aged 0-18
+- **Source:** NHS England, Monthly MHSDS Statistics, [Metadata](https://nhs-prod.global.ssl.fastly.net/binaries/content/assets/website-assets/data-and-information/data-sets/mhsds/mhsds-monthly-metadata-1.xlsx)
+
+### Raw time series
+
+```{r cyp30d.raw.time.series, echo=TRUE, message=FALSE, warning=FALSE}
+#Data
+CAMHS_data_cyp30d <- CAMHS_data %>%
+  filter(.,MEASURE_ID=="MHS30d")
+CAMHS_reldata_cyp30d <- CAMHS_yearly_changes %>%
+  filter(.,MEASURE_ID=="MHS30d")
+
+#Time series chart
+CAMHS_raw_chart_cyp30d <- CAMHS_data_cyp30d %>% 
+  ggplot(., aes(x=start_date, y=MEASURE_VALUE, group= MEASURE_KEY)) +
+  geom_line(aes(color= MEASURE_KEY),
+            size=1) +
+  scale_x_date(date_labels = "%b %Y",date_breaks = "3 months") +
+  scale_y_continuous(labels = scales::comma) +
+  facet_wrap(~timing, scales = "free_x") +
+  theme_ipsum() +
+  xlab("") +
+  ylab("") +
+  labs(col="") +
+  scale_color_brewer(palette = "Set1") +
+  theme(legend.position="bottom",
+        panel.border = element_blank(),
+        strip.text = element_text(size=8),
+        text = element_text(size = 8),
+        legend.title=element_text(size=8),
+        legend.text=element_text(size=8),
+        axis.text = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.text.x = element_text(angle = 45, hjust = 1,size = 8),
+        axis.title.x = element_text(margin = unit(c(3, 0, 0, 0), "mm"),size = 8),
+        axis.title.y = element_text(size = 8))
+  
+ggplotly(CAMHS_raw_chart_cyp30d)
+
+#Underlying data
+CAMHS_data_cyp30d %>%
+  select(.,start_date,MEASURE_KEY,MEASURE_VALUE) %>%
+  arrange(.,start_date) %>% 
+  knitr::kable(., align = "lccrr",format.args = list(big.mark = ","))
+```
+
+### Monthly average, per year
+
+```{r cyp30d.avg, echo=TRUE, message=FALSE, warning=FALSE}
+#Average per calendar year
+CAMHS_data_cyp30d %>%
+  mutate(.,year=lubridate::year(start_date)) %>% 
+  group_by(MEASURE_ID,MEASURE_KEY,year) %>%
+  summarise(average=mean(MEASURE_VALUE,na.rm = TRUE),
+            months_included= n()) %>% 
+  ungroup() %>%
+  filter(.,months_included==12) %>%
+  knitr::kable(., align = "lccrr")
+```
+
+### Relative changes compared to last year
+
+```{r cyp30d.rel.changes, echo=TRUE, message=FALSE, warning=FALSE}
+#Relative changes chart
+CAMHS_changes_chart_cyp30d <- CAMHS_reldata_cyp30d %>%
+  ggplot(., aes(x=start_date, y=pct_change_l1, group= MEASURE_KEY)) +
+  facet_wrap(~timing, scales = "free_x") +
+  geom_line(aes(color= MEASURE_KEY),size=1) +
+  geom_hline(yintercept=0, linetype="dashed", color = "red") +
+  scale_x_date(date_labels = "%b %Y",date_breaks = "1 month") +
+  theme_ipsum() +
+  xlab("") +
+  ylab("% change") +
+  labs(col="") +
+  scale_color_manual(values=c("Open referrals" = "aquamarine4",
+                              "People in contact" = "tomato3",
+                              "First contacts (<18)" = "olivedrab4",
+                              "Attended contacts (<18)" = "violetred",
+                              "New referrals (<18)" = "magenta1")) +
+  theme(legend.position="bottom",
+        panel.border = element_blank(),
+        strip.text = element_text(size=8),
+        text = element_text(size = 8),
+        legend.title=element_text(size=8),
+        legend.text=element_text(size=8),
+        axis.text = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.text.x = element_text(angle = 45, hjust = 1,size = 8),
+        axis.title.x = element_text(margin = unit(c(3, 0, 0, 0), "mm"),size = 8),
+        axis.title.y = element_text(size = 8))
+
+ggplotly(CAMHS_changes_chart_cyp30d)
+
+#Underlying data
+CAMHS_reldata_cyp30d %>%
+  select(.,start_date,MEASURE_KEY,pct_change_l1) %>%
+  arrange(.,start_date) %>% 
+  knitr::kable(., align = "lccrr",format.args = list(big.mark = ","))
+```
+
+## Open referrals {.tabset}
+
+- **Measure code:** CYP23
+- **Measure description:** Open referrals (children's and young people's mental health services) at end of the reporting period
+- **Source:** NHS England, Monthly MHSDS Statistics, [Metadata](https://nhs-prod.global.ssl.fastly.net/binaries/content/assets/website-assets/data-and-information/data-sets/mhsds/mhsds-monthly-metadata-1.xlsx)
+
+### Raw time series
+
+```{r cyp23.raw.time.series, echo=TRUE, message=FALSE, warning=FALSE}
+#Data
+CAMHS_data_cyp23 <- CAMHS_data %>%
+  filter(.,MEASURE_ID=="CYP23")
+CAMHS_reldata_cyp23 <- CAMHS_yearly_changes %>%
+  filter(.,MEASURE_ID=="CYP23")
+
+#Time series chart
+CAMHS_raw_chart_cyp23 <- CAMHS_data_cyp23 %>% 
+  ggplot(., aes(x=start_date, y=MEASURE_VALUE, group= MEASURE_KEY)) +
+  geom_line(aes(color= MEASURE_KEY),
+            size=1) +
+  scale_x_date(date_labels = "%b %Y",date_breaks = "3 months") +
+  scale_y_continuous(labels = scales::comma) +
+  facet_wrap(~timing, scales = "free_x") +
+  theme_ipsum() +
+  xlab("") +
+  ylab("") +
+  labs(col="") +
+  scale_color_brewer(palette = "Set1") +
+  theme(legend.position="bottom",
+        panel.border = element_blank(),
+        strip.text = element_text(size=8),
+        text = element_text(size = 8),
+        legend.title=element_text(size=8),
+        legend.text=element_text(size=8),
+        axis.text = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.text.x = element_text(angle = 45, hjust = 1,size = 8),
+        axis.title.x = element_text(margin = unit(c(3, 0, 0, 0), "mm"),size = 8),
+        axis.title.y = element_text(size = 8))
+  
+ggplotly(CAMHS_raw_chart_cyp23)
+
+#Underlying data
+CAMHS_data_cyp23 %>%
+  select(.,start_date,MEASURE_KEY,MEASURE_VALUE) %>%
+  arrange(.,start_date) %>% 
+  knitr::kable(., align = "lccrr",format.args = list(big.mark = ","))
+```
+
+### Monthly average, per year
+
+```{r cyp23.avg, echo=TRUE, message=FALSE, warning=FALSE}
+#Average per calendar year
+CAMHS_data_cyp23 %>%
+  mutate(.,year=lubridate::year(start_date)) %>% 
+  group_by(MEASURE_ID,MEASURE_KEY,year) %>%
+  summarise(average=mean(MEASURE_VALUE,na.rm = TRUE),
+            months_included= n()) %>% 
+  ungroup() %>%
+  filter(.,months_included==12) %>%
+  knitr::kable(., align = "lccrr")
+```
+
+### Relative changes compared to last year
+
+```{r cyp23.rel.changes, echo=TRUE, message=FALSE, warning=FALSE}
+#Relative changes chart
+CAMHS_changes_chart_cyp23 <- CAMHS_reldata_cyp23 %>%
+  ggplot(., aes(x=start_date, y=pct_change_l1, group= MEASURE_KEY)) +
+  facet_wrap(~timing, scales = "free_x") +
+  geom_line(aes(color= MEASURE_KEY),size=1) +
+  geom_hline(yintercept=0, linetype="dashed", color = "red") +
+  scale_x_date(date_labels = "%b %Y",date_breaks = "1 month") +
+  theme_ipsum() +
+  xlab("") +
+  ylab("% change") +
+  labs(col="") +
+  scale_color_manual(values=c("Open referrals" = "aquamarine4",
+                              "People in contact" = "tomato3",
+                              "First contacts (<18)" = "olivedrab4",
+                              "Attended contacts (<18)" = "violetred",
+                              "New referrals (<18)" = "magenta1")) +
+  theme(legend.position="bottom",
+        panel.border = element_blank(),
+        strip.text = element_text(size=8),
+        text = element_text(size = 8),
+        legend.title=element_text(size=8),
+        legend.text=element_text(size=8),
+        axis.text = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.text.x = element_text(angle = 45, hjust = 1,size = 8),
+        axis.title.x = element_text(margin = unit(c(3, 0, 0, 0), "mm"),size = 8),
+        axis.title.y = element_text(size = 8))
+
+ggplotly(CAMHS_changes_chart_cyp23)
+
+#Underlying data
+CAMHS_reldata_cyp23 %>%
+  select(.,start_date,MEASURE_KEY,pct_change_l1) %>%
+  arrange(.,start_date) %>% 
+  knitr::kable(., align = "lccrr",format.args = list(big.mark = ","))
+```
+
+## People with eating disorders being seen within target times (<18)
+
+- **Measure code:** ED86e
+- **Measure description:** Proportion of referrals with eating disorders categorized as urgent cases entering treatment within one week in RP, aged 0-18
+- **Source:** NHS England, Monthly MHSDS Statistics, [Metadata](https://nhs-prod.global.ssl.fastly.net/binaries/content/assets/website-assets/data-and-information/data-sets/mhsds/mhsds-monthly-metadata-1.xlsx)
+
+- **Measure code:** ED87e
+- **Measure description:** Proportion of referrals with eating disorders categorized as routine cases entering treatment within four weeks in RP, aged 0-18
+- **Source:** NHS England, Monthly MHSDS Statistics, [Metadata](https://nhs-prod.global.ssl.fastly.net/binaries/content/assets/website-assets/data-and-information/data-sets/mhsds/mhsds-monthly-metadata-1.xlsx)
+
+
+```{r ed.targets, echo=TRUE, message=FALSE, warning=FALSE,fig.width=8,fig.height=6}
+#Eating disorders data
+target_time_ed_data_new <- MHSDS_main_pooled_dashboard %>%
+  filter(.,PRIMARY_LEVEL_DESCRIPTION=="England",
+         MEASURE_ID %in% c("ED86e","ED87e")) %>%
+  select(.,start_date,end_date,PRIMARY_LEVEL_DESCRIPTION,MEASURE_ID,MEASURE_VALUE)
+
+target_time_ed_data <- MHSDS_ED_pooled_dashboard %>%
+  filter(.,PRIMARY_LEVEL_DESCRIPTION=="England",
+         MEASURE_ID %in% c("ED86e","ED87e")) %>%
+  select(.,start_date,end_date,PRIMARY_LEVEL_DESCRIPTION,MEASURE_ID,MEASURE_VALUE) %>%
+  plyr::rbind.fill(.,target_time_ed_data_new) %>% 
+  mutate(.,timing=ifelse(end_date<ymd("2020-04-01"),"Pre-COVID","Post-COVID")) %>%
+  mutate(.,timing=fct_relevel(timing, c("Pre-COVID","Post-COVID"))) %>%
+  mutate(.,MEASURE_VALUE=as.numeric(MEASURE_VALUE),
+         Type=case_when(MEASURE_ID=="ED86e" ~ "urgent",
+                        MEASURE_ID=="ED87e" ~ "non urgent",
+                        TRUE ~ "NA"))
+
+#Eating disorders chart
+target_time_ed_chart <- target_time_ed_data %>%
+  ggplot(., aes(x=end_date, y=MEASURE_VALUE, group=Type)) +
+  geom_line(aes(color=Type),size=1) +
+  scale_x_date(date_labels = "%b %Y",date_breaks = "1 month") +
+  scale_y_continuous(labels = scales::comma) +
+  facet_wrap(~timing, scales = "free_x") +
+  theme_ipsum() +
+  xlab("") +
+  ylab("") +
+  labs(col="", title="") +
+  scale_colour_manual(values=
+                        c("urgent" = "brown", "non urgent" = "darkseagreen4")) +
+  theme(legend.position="bottom",
+        panel.border = element_blank(),
+        strip.text = element_text(size=8),
+        text = element_text(size = 8),
+        legend.title=element_text(size=8),
+        legend.text=element_text(size=8),
+        axis.text = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.text.x = element_text(angle = 45, hjust = 1,size = 8),
+        axis.title.x = element_text(margin = unit(c(3, 0, 0, 0), "mm"),size = 8),
+        axis.title.y = element_text(size = 8))
+
+ggplotly(target_time_ed_chart)
+```
+
+## Health Education England data on workforce (compared to activity levels from NHS England)
+
+- Source of staff numbers is Health Education England [report](https://www.hee.nhs.uk/sites/default/files/documents/National%20HEE%20Children%20Young%20People%20Mental%20Health%20Service%20Report%20-%20Final%20%282.11.2021%29.pdf)
+
+```{r hee.staff, echo=TRUE, message=FALSE, warning=FALSE}
+#NHS Digital on people in contact with CAMHS service
+CAMHS_contacts <- MHSDS_main_pooled_dashboard %>%
+  filter(.,PRIMARY_LEVEL_DESCRIPTION=="England",
+         MEASURE_ID=="CYP01") %>%
+  select(.,start_date,MEASURE_VALUE) %>%
+  mutate(.,date_ymd=lubridate::ymd(start_date)) %>%
+  mutate(.,date_ymd=floor_date(date_ymd, "month"),
+         measure="People in contact CAMHS",
+         MEASURE_VALUE=as.numeric(MEASURE_VALUE)) %>%
+  select(.,-"start_date") %>%
+  arrange(.,date_ymd)
+
+#Turn into indexed data
+CAMHS_contacts_index <- CAMHS_contacts %>%
+  mutate(.,MEASURE_VALUE_MA=zoo::rollmean(MEASURE_VALUE,k=7,fill=NA)) %>% #Use a moving average to compute the mean
+  mutate(.,Jan2019=filter(.,date_ymd=="2019-01-01")$MEASURE_VALUE_MA) %>%
+  filter(.,date_ymd>=ymd("2019-01-01"),!is.na(MEASURE_VALUE_MA)) %>%
+  mutate(.,index=MEASURE_VALUE_MA/Jan2019*100)
+
+#HEE data (copied over from report)
+HEE_staff_index <- data.frame(measure="CYP MH staff",
+  date_ymd=as.Date(c("2019-01-01","2021-04-01")),
+  MEASURE_VALUE=as.numeric(c("14857","20626"))) %>%
+  mutate(.,Jan2019=filter(.,date_ymd=="2019-01-01")$MEASURE_VALUE) %>%
+  mutate(.,index=MEASURE_VALUE/Jan2019*100)
+
+#Append two sources together
+CAMHS_and_HEE_staff <- plyr::rbind.fill(CAMHS_contacts_index,HEE_staff_index)
+
+#Show data
+CAMHS_and_HEE_staff %>%
+  knitr::kable(., align = "lccrr")
+```
+
+## NHS England data on workforce (child and adolescent psychiatry only)
+
+```{r nhs.staff, echo=TRUE, message=FALSE, warning=FALSE}
+#NHS data
+NHS_workforce_doctors %>%
+  mutate(.,date_ymd=lubridate::ymd(Date)) %>%
+  mutate(.,date_ymd=floor_date(date_ymd, "month"),
+         measure="FTE doctors") %>%
+  rename(.,MEASURE_VALUE=FTE) %>%
+  filter(Specialty %in% c("Child and adolescent psychiatry")) %>%
+  group_by(date_ymd,measure,Specialty) %>%
+  summarise(MEASURE_VALUE=sum(MEASURE_VALUE,na.rm=TRUE)) %>% #Aggregate over categories
+  ungroup() %>%
+  filter(., date_ymd %in% c(ymd("2019-01-01"),ymd("2021-04-01"))) %>%
+  pivot_wider(
+    names_from = date_ymd,
+    names_sep = ".",
+    values_from = MEASURE_VALUE
+  ) %>%
+  mutate(.,pct_change=(`2021-04-01`-`2019-01-01`)/`2019-01-01`*100) %>%
+  knitr::kable(., align = "lccrr")
+
+#Latest data on consultants
+NHS_workforce_doctors %>%
+  mutate(.,date_ymd=lubridate::ymd(Date)) %>%
+  mutate(.,date_ymd=floor_date(date_ymd, "month"),
+         measure="FTE doctors") %>%
+  rename(.,MEASURE_VALUE=FTE) %>%
+  filter(., date_ymd %in% c(ymd("2021-05-01"))) %>%
+  filter(Specialty %in% c("Child and adolescent psychiatry"))  %>%
+  select(.,-"Date") %>% 
+  knitr::kable(., align = "lccrr")
+```
