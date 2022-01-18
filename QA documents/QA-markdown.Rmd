@@ -29,16 +29,22 @@ clean_data_dir <- "M:/Analytics/CYP MH/Data for NDL long chart/"
 
 #Load main performance data
 MHSDS_main_pooled_dashboard <- fread(paste0(clean_data_dir,"MHSDS_main_pooled.csv"),header=TRUE, sep=",", check.names=T)
+# TW - looked at original source page and guess you manually put together the monthly CSVs
+unique(MHSDS_main_pooled_dashboard$REPORTING_PERIOD_START) # mix of date formats but not sure if it matters
 
 #Load eating disorder data
 MHSDS_ED_pooled_dashboard <- fread(paste0(clean_data_dir,"MHSDS_ED_pooled.csv"),header=TRUE, sep=",", check.names=T)
+unique(MHSDS_ED_pooled_dashboard$REPORTING_PERIOD_START) # just data for Nov 2020 - Mar 2021, is that right?
+# guess you just filtered the main dataset to create this
 
 #Load additional data on waiting times (one-off data release for financial year 2019/20)
 MHSDS_wait_times <- read_excel(paste0(clean_data_dir,"additional_cyp_wait_times_1920.xlsx"), sheet = "1b",skip=17)
+# what's the source for this?
 
 #Load workforce data (consultants)
 NHS_workforce_doctors <- read_excel(
   paste0(clean_data_dir,"NHS workforce statistics - data.xlsx"))
+# couldn't find this time series data at the link in the readme - just monthly snapshots
 
 #Load workforce data (other)
 NHS_workforce_other <- read_excel(
@@ -50,13 +56,14 @@ NHS_workforce_other <- read_excel(
 CAMHS_data <- MHSDS_main_pooled_dashboard %>%
   filter(PRIMARY_LEVEL_DESCRIPTION=="England",
          MEASURE_ID %in% c("CYP01","MHS61a","CYP23","MHS30d","MHS32a")) %>%
+  # checked the defs of these definitions in the metadata: https://nhs-prod.global.ssl.fastly.net/binaries/content/assets/website-assets/data-and-information/data-sets/mhsds/mhsds-monthly-metadata-1.xlsx
   filter(.,!(MEASURE_ID=="MHS32a"&BREAKDOWN!="England")) %>% 
   mutate(MEASURE_KEY=case_when(
-           MEASURE_ID=="MHS30d" ~ "Attended contacts (<18)",
+           MEASURE_ID=="MHS30d" ~ "Attended contacts (<18)", # def. missing
            MEASURE_ID=="CYP01" ~ "People in contact",
-           MEASURE_ID=="MHS61a" ~ "First contacts (<18)",
+           MEASURE_ID=="MHS61a" ~ "First contacts (<18)", # def. missing
            MEASURE_ID=="CYP23" ~ "Open referrals",
-           MEASURE_ID=="MHS32a" ~ "New referrals (<18)",
+           MEASURE_ID=="MHS32a" ~ "New referrals (<18)", # def. missing
            TRUE ~ "NA"
          )) %>% 
   select(.,start_date,end_date,month_year,PRIMARY_LEVEL_DESCRIPTION,MEASURE_ID,MEASURE_KEY,MEASURE_VALUE) %>% 
@@ -130,6 +137,8 @@ CAMHS_raw_chart_cyp01 <- CAMHS_data_cyp01 %>%
         axis.title.y = element_text(size = 8))
   
 ggplotly(CAMHS_raw_chart_cyp01)
+# only slight concern with this chart is the facet wrap
+# the gap might make people think there is missing data or that you've deliberately removed a month
 
 #Underlying data
 CAMHS_data_cyp01 %>%
@@ -201,6 +210,7 @@ CAMHS_reldata_cyp01 %>%
 ### Raw time series
 
 ```{r cyp32a.raw.time.series, echo=TRUE, message=FALSE, warning=FALSE}
+# TW - when you go to the metadata link, the file doesn't contain this EXACT measure - just the broader MHS32 - worth noting?
 #Data
 CAMHS_data_cyp32a <- CAMHS_data %>%
   filter(.,MEASURE_ID=="MHS32a")
@@ -212,6 +222,7 @@ CAMHS_raw_chart_cyp32a <- CAMHS_data_cyp32a %>%
   ggplot(., aes(x=start_date, y=MEASURE_VALUE, group= MEASURE_KEY)) +
   geom_line(aes(color= MEASURE_KEY),
             size=1) +
+  geom_line(aes(y=zoo::rollmean(MEASURE_VALUE, 6, na.pad=TRUE))) + # this series and "New referrals" is very jumpy - is it worth adding a moving average?
   scale_x_date(date_labels = "%b %Y",date_breaks = "3 months") +
   scale_y_continuous(labels = scales::comma) +
   facet_wrap(~timing, scales = "free_x") +
@@ -251,7 +262,7 @@ CAMHS_data_cyp32a %>%
   summarise(average=mean(MEASURE_VALUE,na.rm = TRUE),
             months_included= n()) %>% 
   ungroup() %>%
-  filter(.,months_included==12) %>%
+  filter(.,months_included==12) %>% # are you sure you want to keep this filter? - as this way you only get 1 year, can't compare
   knitr::kable(., align = "lccrr")
 ```
 
@@ -288,6 +299,9 @@ CAMHS_changes_chart_cyp32a <- CAMHS_reldata_cyp32a %>%
 
 ggplotly(CAMHS_changes_chart_cyp32a)
 
+# when I look at this chart in isolation - I think maybe people were right that the moving baseline can be a bit misleading, and it would be better
+# to just do difference from 2019. But it's also good for all the charts to adopt the same approach...
+
 #Underlying data
 CAMHS_reldata_cyp32a %>%
   select(.,start_date,MEASURE_KEY,pct_change_l1) %>%
@@ -304,6 +318,7 @@ CAMHS_reldata_cyp32a %>%
 ### Raw time series
 
 ```{r cyp61a.raw.time.series, echo=TRUE, message=FALSE, warning=FALSE}
+# again - can only get metadata for the broad metric MHS61
 #Data
 CAMHS_data_cyp61a <- CAMHS_data %>%
   filter(.,MEASURE_ID=="MHS61a")
@@ -315,6 +330,7 @@ CAMHS_raw_chart_cyp61a <- CAMHS_data_cyp61a %>%
   ggplot(., aes(x=start_date, y=MEASURE_VALUE, group= MEASURE_KEY)) +
   geom_line(aes(color= MEASURE_KEY),
             size=1) +
+  geom_line(aes(y=zoo::rollmean(MEASURE_VALUE, 6, na.pad=TRUE))) + # moving average
   scale_x_date(date_labels = "%b %Y",date_breaks = "3 months") +
   scale_y_continuous(labels = scales::comma) +
   facet_wrap(~timing, scales = "free_x") +
@@ -354,7 +370,7 @@ CAMHS_data_cyp61a %>%
   summarise(average=mean(MEASURE_VALUE,na.rm = TRUE),
             months_included= n()) %>% 
   ungroup() %>%
-  filter(.,months_included==12) %>%
+  filter(.,months_included==12) %>% # same comment on this filter - leaves you with just 1 complete year...
   knitr::kable(., align = "lccrr")
 ```
 
@@ -407,6 +423,7 @@ CAMHS_reldata_cyp61a %>%
 ### Raw time series
 
 ```{r cyp30d.raw.time.series, echo=TRUE, message=FALSE, warning=FALSE}
+# metadata - again, can only get MHS30 definition
 #Data
 CAMHS_data_cyp30d <- CAMHS_data %>%
   filter(.,MEASURE_ID=="MHS30d")
@@ -457,7 +474,7 @@ CAMHS_data_cyp30d %>%
   summarise(average=mean(MEASURE_VALUE,na.rm = TRUE),
             months_included= n()) %>% 
   ungroup() %>%
-  filter(.,months_included==12) %>%
+  filter(.,months_included==12) %>% # again - do you want to relax this so you can compare to other years?
   knitr::kable(., align = "lccrr")
 ```
 
