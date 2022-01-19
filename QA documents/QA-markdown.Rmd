@@ -61,7 +61,8 @@ CAMHS_data <- MHSDS_main_pooled_dashboard %>%
          )) %>% 
   select(.,start_date,end_date,month_year,PRIMARY_LEVEL_DESCRIPTION,MEASURE_ID,MEASURE_KEY,MEASURE_VALUE) %>% 
   mutate(.,MEASURE_VALUE=as.numeric(MEASURE_VALUE),
-         timing=ifelse(start_date<ymd("2020-04-01"),"Pre-COVID","Post-COVID")) %>%
+         timing=ifelse(start_date<ymd("2020-04-01"),"Pre-COVID","Post-COVID"),
+         month_num=lubridate::month(start_date)) %>%
   mutate(.,timing=fct_relevel(timing, c("Pre-COVID","Post-COVID"))) %>% 
   arrange(.,start_date) %>%
   as_tibble()
@@ -87,6 +88,23 @@ CAMHS_yearly_changes <- left_join(CAMHS_yearly_changes,
   mutate(pct_change_l1=(MEASURE_VALUE-MEASURE_VALUE_l1)/MEASURE_VALUE_l1*100) %>%
   filter(.,!is.na(pct_change_l1))
 rm(CAMHS_data_l1)
+```
+
+```{r data.export, echo=TRUE, message=FALSE, warning=FALSE}
+flourish_data_mhsds <- CAMHS_data %>%
+  filter(.,MEASURE_ID %in% c("CYP01","MHS61a","CYP23","MHS32a")) %>%
+  select(.,start_date,end_date,month_year,PRIMARY_LEVEL_DESCRIPTION,MEASURE_ID,MEASURE_KEY,MEASURE_VALUE) %>%
+  mutate(.,month=lubridate::month(start_date, label = TRUE),
+         year=lubridate::year(start_date)) %>%
+  select(.,month,year,MEASURE_ID,MEASURE_KEY,MEASURE_VALUE) %>%
+  pivot_wider(.,
+    names_from = year,
+    names_sep = ".",
+    values_from = c(MEASURE_VALUE)
+  ) %>%
+  arrange(.,MEASURE_ID,month)
+
+fwrite(flourish_data_mhsds,paste0(onedrive_charts_data,"Fig2alt.csv"))
 ```
 
 ## People in contact with CAMHS {.tabset}
@@ -151,6 +169,22 @@ CAMHS_data_cyp01 %>%
   filter(.,months_included==12) %>%
   knitr::kable(., align = "lccrr")
 ```
+
+### Monthly average, per year (Jan to Sep)
+
+```{r cyp01.avg.bis, echo=TRUE, message=FALSE, warning=FALSE}
+#Average per calendar year
+CAMHS_data_cyp01 %>%
+  mutate(.,year=lubridate::year(start_date)) %>%
+  filter(.,month_num>=1&month_num<=9) %>%
+  group_by(MEASURE_ID,MEASURE_KEY,year) %>%
+  summarise(average=mean(MEASURE_VALUE,na.rm = TRUE),
+            months_included= n()) %>% 
+  ungroup() %>%
+  filter(.,months_included==9) %>%
+  knitr::kable(., align = "lccrr")
+```
+
 
 ### Relative changes compared to last year
 
@@ -255,6 +289,22 @@ CAMHS_data_cyp32a %>%
   knitr::kable(., align = "lccrr")
 ```
 
+### Monthly average, per year (Jan to Sep)
+
+```{r cyp32a.avg.bis, echo=TRUE, message=FALSE, warning=FALSE}
+#Average per calendar year
+CAMHS_data_cyp32a %>%
+  mutate(.,year=lubridate::year(start_date)) %>%
+  filter(.,month_num>=1&month_num<=9) %>%
+  group_by(MEASURE_ID,MEASURE_KEY,year) %>%
+  summarise(average=mean(MEASURE_VALUE,na.rm = TRUE),
+            months_included= n()) %>% 
+  ungroup() %>%
+  filter(.,months_included==9) %>%
+  knitr::kable(., align = "lccrr")
+```
+
+
 ### Relative changes compared to last year
 
 ```{r cyp32a.rel.changes, echo=TRUE, message=FALSE, warning=FALSE}
@@ -355,6 +405,21 @@ CAMHS_data_cyp61a %>%
             months_included= n()) %>% 
   ungroup() %>%
   filter(.,months_included==12) %>%
+  knitr::kable(., align = "lccrr")
+```
+
+### Monthly average, per year (Jan to Sep)
+
+```{r cyp61a.avg.bis, echo=TRUE, message=FALSE, warning=FALSE}
+#Average per calendar year
+CAMHS_data_cyp61a %>%
+  mutate(.,year=lubridate::year(start_date)) %>%
+  filter(.,month_num>=1&month_num<=9) %>%
+  group_by(MEASURE_ID,MEASURE_KEY,year) %>%
+  summarise(average=mean(MEASURE_VALUE,na.rm = TRUE),
+            months_included= n()) %>% 
+  ungroup() %>%
+  filter(.,months_included==9) %>%
   knitr::kable(., align = "lccrr")
 ```
 
@@ -461,6 +526,21 @@ CAMHS_data_cyp30d %>%
   knitr::kable(., align = "lccrr")
 ```
 
+### Monthly average, per year (Jan to Sep)
+
+```{r cyp30d.avg.bis, echo=TRUE, message=FALSE, warning=FALSE}
+#Average per calendar year
+CAMHS_data_cyp30d %>%
+  mutate(.,year=lubridate::year(start_date)) %>% 
+  filter(.,month_num>=1&month_num<=9) %>%
+  group_by(MEASURE_ID,MEASURE_KEY,year) %>%
+  summarise(average=mean(MEASURE_VALUE,na.rm = TRUE),
+            months_included= n()) %>% 
+  ungroup() %>%
+  filter(.,months_included==9) %>%
+  knitr::kable(., align = "lccrr")
+```
+
 ### Relative changes compared to last year
 
 ```{r cyp30d.rel.changes, echo=TRUE, message=FALSE, warning=FALSE}
@@ -563,6 +643,22 @@ CAMHS_data_cyp23 %>%
   filter(.,months_included==12) %>%
   knitr::kable(., align = "lccrr")
 ```
+
+### Monthly average, per year (Jan to Sep)
+
+```{r cyp23.avg.bis, echo=TRUE, message=FALSE, warning=FALSE}
+#Average per calendar year
+CAMHS_data_cyp23 %>%
+  mutate(.,year=lubridate::year(start_date)) %>%
+  filter(.,month_num>=1&month_num<=9) %>%
+  group_by(MEASURE_ID,MEASURE_KEY,year) %>%
+  summarise(average=mean(MEASURE_VALUE,na.rm = TRUE),
+            months_included= n()) %>% 
+  ungroup() %>%
+  filter(.,months_included==9) %>%
+  knitr::kable(., align = "lccrr")
+```
+
 
 ### Relative changes compared to last year
 
