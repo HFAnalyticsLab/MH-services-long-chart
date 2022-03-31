@@ -43,13 +43,16 @@ NHS_workforce_doctors <- read_excel(
 #Load workforce data (other)
 NHS_workforce_other <- read_excel(
   paste0(clean_data_dir,"NHS workforce statistics - other - data.xlsx"))
+
+#Load Scottish CAMHS data
+scotland_camhs_appended <- fread(paste0(clean_data_dir,"scotland_camhs_appended.csv"),header=TRUE, sep=",", check.names=T)
 ```
 
 ```{r MHSDS.data, echo=TRUE, message=FALSE, warning=FALSE}
 #Subsample of metrics from MHSDS data
 CAMHS_data <- MHSDS_main_pooled_dashboard %>%
   filter(PRIMARY_LEVEL_DESCRIPTION=="England",
-         MEASURE_ID %in% c("CYP01","MHS61a","CYP23","MHS30d","MHS32a")) %>%
+         MEASURE_ID %in% c("CYP01","MHS61a","CYP23","MHS30d","MHS32a","CYP32")) %>%
   filter(.,!(MEASURE_ID=="MHS32a"&BREAKDOWN!="England")) %>% 
   mutate(MEASURE_KEY=case_when(
            MEASURE_ID=="MHS30d" ~ "Attended contacts (<18)",
@@ -57,6 +60,7 @@ CAMHS_data <- MHSDS_main_pooled_dashboard %>%
            MEASURE_ID=="MHS61a" ~ "First contacts (<18)",
            MEASURE_ID=="CYP23" ~ "Open referrals",
            MEASURE_ID=="MHS32a" ~ "New referrals (<18)",
+           MEASURE_ID=="CYP32" ~ "New referrals to CYPMHS",
            TRUE ~ "NA"
          )) %>% 
   select(.,start_date,end_date,month_year,PRIMARY_LEVEL_DESCRIPTION,MEASURE_ID,MEASURE_KEY,MEASURE_VALUE) %>% 
@@ -104,8 +108,199 @@ flourish_data_mhsds <- CAMHS_data %>%
   ) %>%
   arrange(.,MEASURE_ID,month)
 
-fwrite(flourish_data_mhsds,paste0(onedrive_charts_data,"Fig2alt.csv"))
+#fwrite(flourish_data_mhsds,paste0(onedrive_charts_data,"Fig2alt.csv"))
 ```
+
+## Performance against 18 week target in Scottish CAMHS {.tabset}
+
+- **Measure code:** TotalPatientsSeen and NumberOfPatientsSeen0To18Weeks
+- **Measure description:** 
+- **Source:** NHS Scotland [Open Data](https://www.opendata.nhs.scot/dataset/child-and-adolescent-mental-health-waiting-times)
+
+### Raw time series
+
+```{r scot.90, echo=TRUE, message=FALSE, warning=FALSE}
+#Data
+CAMHS_Scotland_18wks <- scotland_camhs_appended %>%
+  filter(.,Metric %in% c("TotalPatientsSeen","NumberOfPatientsSeen0To18Weeks"),
+         HB=="S92000003") %>%
+  pivot_wider(names_from = Metric,
+              names_sep = ".",
+              values_from = c(Count)) %>%
+  mutate(.,pct_within_18wks=as.numeric(NumberOfPatientsSeen0To18Weeks)/
+           as.numeric(TotalPatientsSeen)*100,
+         year_month=ymd(year_month))
+
+#Time series chart
+CAMHS_Scotland_18wks_chart <- CAMHS_Scotland_18wks %>% 
+  ggplot(., aes(x=year_month, y=pct_within_18wks)) +
+  geom_line(size=1) +
+  scale_x_date(date_labels = "%b %Y",date_breaks = "3 months") +
+  scale_y_continuous(labels = scales::comma, limits=c(0,100)) +
+  geom_hline(yintercept=90, linetype="dashed", color = "red") +
+  theme_ipsum() +
+  xlab("") +
+  ylab("") +
+  labs(col="") +
+  scale_color_brewer(palette = "Set1") +
+  theme(legend.position="bottom",
+        panel.border = element_blank(),
+        strip.text = element_text(size=8),
+        text = element_text(size = 8),
+        legend.title=element_text(size=8),
+        legend.text=element_text(size=8),
+        axis.text = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.text.x = element_text(angle = 45, hjust = 1,size = 8),
+        axis.title.x = element_text(margin = unit(c(3, 0, 0, 0), "mm"),size = 8),
+        axis.title.y = element_text(size = 8))
+  
+ggplotly(CAMHS_Scotland_18wks_chart)
+
+#Underlying data
+CAMHS_Scotland_18wks %>%
+  arrange(.,year_month) %>% 
+  knitr::kable(., align = "lccrr",format.args = list(big.mark = ","))
+```
+
+### Monthly average, per year
+
+```{r scot.90.avg, echo=TRUE, message=FALSE, warning=FALSE}
+#Average per calendar year
+CAMHS_Scotland_18wks %>%
+  mutate(.,year=lubridate::year(year_month)) %>% 
+  group_by(year) %>%
+  summarise(average=mean(pct_within_18wks,na.rm = TRUE),
+            months_included= n()) %>% 
+  ungroup() %>%
+  filter(.,months_included==12) %>%
+  knitr::kable(., align = "lccrr")
+```
+
+## People still receiving treatment in Scottish CAMHS {.tabset}
+
+- **Measure code:** OpenCases
+- **Measure description:** 
+- **Source:** NHS Scotland [Open Data](https://www.opendata.nhs.scot/dataset/child-and-adolescent-mental-health-waiting-times)
+
+### Raw time series
+
+```{r scot.cyp01, echo=TRUE, message=FALSE, warning=FALSE}
+#Data
+CAMHS_Scotland_open <- scotland_camhs_appended %>%
+  filter(.,Metric %in% c("OpenCases"),
+         HB=="S92000003") %>%
+  mutate(.,Count=as.numeric(Count),
+         year_month=ymd(year_month))
+
+#Time series chart
+CAMHS_Scotland_open_chart <- CAMHS_Scotland_open %>% 
+  ggplot(., aes(x=year_month, y=Count, group= Metric)) +
+  geom_line(aes(color= Metric),
+            size=1) +
+  scale_x_date(date_labels = "%b %Y",date_breaks = "3 months") +
+  scale_y_continuous(labels = scales::comma) +
+  theme_ipsum() +
+  xlab("") +
+  ylab("") +
+  labs(col="") +
+  scale_color_brewer(palette = "Set1") +
+  theme(legend.position="bottom",
+        panel.border = element_blank(),
+        strip.text = element_text(size=8),
+        text = element_text(size = 8),
+        legend.title=element_text(size=8),
+        legend.text=element_text(size=8),
+        axis.text = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.text.x = element_text(angle = 45, hjust = 1,size = 8),
+        axis.title.x = element_text(margin = unit(c(3, 0, 0, 0), "mm"),size = 8),
+        axis.title.y = element_text(size = 8))
+  
+ggplotly(CAMHS_Scotland_open_chart)
+
+#Underlying data
+CAMHS_Scotland_open %>%
+  arrange(.,year_month) %>% 
+  knitr::kable(., align = "lccrr",format.args = list(big.mark = ","))
+```
+
+### Monthly average, per year
+
+```{r scot.cyp01.avg, echo=TRUE, message=FALSE, warning=FALSE}
+#Average per calendar year
+CAMHS_Scotland_open %>%
+  mutate(.,year=lubridate::year(year_month)) %>% 
+  group_by(Metric,year) %>%
+  summarise(average=mean(Count,na.rm = TRUE),
+            months_included= n()) %>% 
+  ungroup() %>%
+  filter(.,months_included==12) %>%
+  knitr::kable(., align = "lccrr")
+```
+
+## People waiting for treatment in Scottish CAMHS {.tabset}
+
+- **Measure code:** TotalPatientsWaiting
+- **Measure description:** 
+- **Source:** NHS Scotland [Open Data](https://www.opendata.nhs.scot/dataset/child-and-adolescent-mental-health-waiting-times)
+
+### Raw time series
+
+```{r scot.cypwait, echo=TRUE, message=FALSE, warning=FALSE}
+#Data
+CAMHS_Scotland_waiting <- scotland_camhs_appended %>%
+  filter(.,Metric %in% c("TotalPatientsWaiting"),
+         HB=="S92000003") %>%
+  mutate(.,Count=as.numeric(Count),
+         year_month=ymd(year_month))
+
+#Time series chart
+CAMHS_Scotland_waiting_chart <- CAMHS_Scotland_waiting %>% 
+  ggplot(., aes(x=year_month, y=Count, group= Metric)) +
+  geom_line(aes(color= Metric),
+            size=1) +
+  scale_x_date(date_labels = "%b %Y",date_breaks = "3 months") +
+  scale_y_continuous(labels = scales::comma) +
+  theme_ipsum() +
+  xlab("") +
+  ylab("") +
+  labs(col="") +
+  scale_color_brewer(palette = "Set1") +
+  theme(legend.position="bottom",
+        panel.border = element_blank(),
+        strip.text = element_text(size=8),
+        text = element_text(size = 8),
+        legend.title=element_text(size=8),
+        legend.text=element_text(size=8),
+        axis.text = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.text.x = element_text(angle = 45, hjust = 1,size = 8),
+        axis.title.x = element_text(margin = unit(c(3, 0, 0, 0), "mm"),size = 8),
+        axis.title.y = element_text(size = 8))
+  
+ggplotly(CAMHS_Scotland_waiting_chart)
+
+#Underlying data
+CAMHS_Scotland_waiting %>%
+  arrange(.,year_month) %>% 
+  knitr::kable(., align = "lccrr",format.args = list(big.mark = ","))
+```
+
+### Monthly average, per year
+
+```{r scot.cypwait.avg, echo=TRUE, message=FALSE, warning=FALSE}
+#Average per calendar year
+CAMHS_Scotland_waiting %>%
+  mutate(.,year=lubridate::year(year_month)) %>% 
+  group_by(Metric,year) %>%
+  summarise(average=mean(Count,na.rm = TRUE),
+            months_included= n()) %>% 
+  ungroup() %>%
+  filter(.,months_included==12) %>%
+  knitr::kable(., align = "lccrr")
+```
+
 
 ## People in contact with CAMHS {.tabset}
 
@@ -289,13 +484,13 @@ CAMHS_data_cyp32a %>%
   knitr::kable(., align = "lccrr")
 ```
 
-### Monthly average, per year (Jan to Sep)
+### Monthly average, per year (Apr to Dec)
 
 ```{r cyp32a.avg.bis, echo=TRUE, message=FALSE, warning=FALSE}
 #Average per calendar year
 CAMHS_data_cyp32a %>%
   mutate(.,year=lubridate::year(start_date)) %>%
-  filter(.,month_num>=1&month_num<=9) %>%
+  filter(.,month_num>=4&month_num<=12) %>%
   group_by(MEASURE_ID,MEASURE_KEY,year) %>%
   summarise(average=mean(MEASURE_VALUE,na.rm = TRUE),
             months_included= n()) %>% 
@@ -303,7 +498,6 @@ CAMHS_data_cyp32a %>%
   filter(.,months_included==9) %>%
   knitr::kable(., align = "lccrr")
 ```
-
 
 ### Relative changes compared to last year
 
@@ -343,6 +537,82 @@ CAMHS_reldata_cyp32a %>%
   select(.,start_date,MEASURE_KEY,pct_change_l1) %>%
   arrange(.,start_date) %>% 
   knitr::kable(., align = "lccrr",format.args = list(big.mark = ","))
+```
+
+## New referrals to CYPMHS {.tabset}
+
+- **Measure code:** CYP32
+- **Measure description:** Referrals to children and young people’s mental health services starting in RP
+- **Source:** NHS England, Monthly MHSDS Statistics, [Metadata](https://nhs-prod.global.ssl.fastly.net/binaries/content/assets/website-assets/data-and-information/data-sets/mhsds/mhsds-monthly-metadata-1.xlsx)
+
+### Raw time series
+
+```{r cyp32.raw.time.series, echo=TRUE, message=FALSE, warning=FALSE}
+#Data
+CAMHS_data_cyp32 <- CAMHS_data %>%
+  filter(.,MEASURE_ID=="CYP32")
+
+#Time series chart
+CAMHS_raw_chart_cyp32 <- CAMHS_data_cyp32 %>% 
+  ggplot(., aes(x=start_date, y=MEASURE_VALUE, group= MEASURE_KEY)) +
+  geom_line(aes(color= MEASURE_KEY),
+            size=1) +
+  scale_x_date(date_labels = "%b %Y",date_breaks = "3 months") +
+  scale_y_continuous(labels = scales::comma) +
+  facet_wrap(~timing, scales = "free_x") +
+  theme_ipsum() +
+  xlab("") +
+  ylab("") +
+  labs(col="") +
+  scale_color_brewer(palette = "Set1") +
+  theme(legend.position="bottom",
+        panel.border = element_blank(),
+        strip.text = element_text(size=8),
+        text = element_text(size = 8),
+        legend.title=element_text(size=8),
+        legend.text=element_text(size=8),
+        axis.text = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.text.x = element_text(angle = 45, hjust = 1,size = 8),
+        axis.title.x = element_text(margin = unit(c(3, 0, 0, 0), "mm"),size = 8),
+        axis.title.y = element_text(size = 8))
+
+ggplotly(CAMHS_raw_chart_cyp32)
+
+#Underlying data
+CAMHS_data_cyp32 %>%
+  select(.,start_date,MEASURE_KEY,MEASURE_VALUE) %>%
+  arrange(.,start_date) %>% 
+  knitr::kable(., align = "lccrr",format.args = list(big.mark = ","))
+```
+
+### Monthly average, per year
+
+```{r cyp32.avg, echo=TRUE, message=FALSE, warning=FALSE}
+#Average per calendar year
+CAMHS_data_cyp32 %>%
+  mutate(.,year=lubridate::year(start_date)) %>% 
+  group_by(MEASURE_ID,MEASURE_KEY,year) %>%
+  summarise(average=mean(MEASURE_VALUE,na.rm = TRUE),
+            months_included= n()) %>% 
+  ungroup() %>%
+  filter(.,months_included==12) %>%
+  knitr::kable(., align = "lccrr")
+```
+
+### Monthly average, per year (Apr to Dec)
+
+```{r cyp32.avg.bis, echo=TRUE, message=FALSE, warning=FALSE}
+#Average per calendar year
+CAMHS_data_cyp32 %>%
+  mutate(.,year=lubridate::year(start_date)) %>%
+  filter(.,month_num>=4&month_num<=12) %>%
+  group_by(MEASURE_ID,MEASURE_KEY,year) %>%
+  summarise(average=mean(MEASURE_VALUE,na.rm = TRUE),
+            months_included= n()) %>% 
+  ungroup() %>%
+  filter(.,months_included==9) %>%
+  knitr::kable(., align = "lccrr")
 ```
 
 ## First contacts (<18) {.tabset}
@@ -723,12 +993,12 @@ target_time_ed_data <- MHSDS_ED_pooled_dashboard %>%
          MEASURE_ID %in% c("ED86e","ED87e")) %>%
   select(.,start_date,end_date,PRIMARY_LEVEL_DESCRIPTION,MEASURE_ID,MEASURE_VALUE) %>%
   plyr::rbind.fill(.,target_time_ed_data_new) %>% 
-  mutate(.,timing=ifelse(end_date<ymd("2020-04-01"),"Pre-COVID","Post-COVID")) %>%
-  mutate(.,timing=fct_relevel(timing, c("Pre-COVID","Post-COVID"))) %>%
   mutate(.,MEASURE_VALUE=as.numeric(MEASURE_VALUE),
-         Type=case_when(MEASURE_ID=="ED86e" ~ "urgent",
-                        MEASURE_ID=="ED87e" ~ "non urgent",
-                        TRUE ~ "NA"))
+         Type=case_when(MEASURE_ID=="ED86e" ~ "Urgent",
+                        MEASURE_ID=="ED87e" ~ "Routine",
+                        TRUE ~ "NA"),
+         Metric="Starting within target time",
+         time_window=ymd(end_date)-ymd(start_date))
 
 #Eating disorders chart
 target_time_ed_chart <- target_time_ed_data %>%
@@ -736,13 +1006,12 @@ target_time_ed_chart <- target_time_ed_data %>%
   geom_line(aes(color=Type),size=1) +
   scale_x_date(date_labels = "%b %Y",date_breaks = "1 month") +
   scale_y_continuous(labels = scales::comma) +
-  facet_wrap(~timing, scales = "free_x") +
   theme_ipsum() +
   xlab("") +
   ylab("") +
   labs(col="", title="") +
   scale_colour_manual(values=
-                        c("urgent" = "brown", "non urgent" = "darkseagreen4")) +
+                        c("Urgent" = "brown", "Routine" = "darkseagreen4")) +
   theme(legend.position="bottom",
         panel.border = element_blank(),
         strip.text = element_text(size=8),
@@ -756,6 +1025,185 @@ target_time_ed_chart <- target_time_ed_data %>%
         axis.title.y = element_text(size = 8))
 
 ggplotly(target_time_ed_chart)
+```
+
+```{r ED.year.average, echo=TRUE, message=FALSE, warning=FALSE,fig.width=8,fig.height=6}
+target_time_ed_data %>%
+  arrange(.,end_date) %>% 
+  select(.,MEASURE_ID,Type,start_date,end_date,time_window,MEASURE_VALUE) %>%
+  filter(.,start_date %in% ymd(c("2021-01-01","2021-04-01","2021-07-01","2021-10-01"))) %>%
+  group_by(MEASURE_ID,Type) %>%
+  summarise(.,MEASURE_VALUE=mean(MEASURE_VALUE)) %>% 
+  ungroup() %>%
+  knitr::kable(., align = "lccrr",format.args = list(big.mark = ","))
+```
+
+## New referrals into eating disorder services (<18)
+
+- **Measure code:** ED32
+- **Measure description:** Referrals into a service with a primary reason of referral of Eating Disorder received in the reporting period, among those aged 0-18.
+- **Source:** NHS England, Monthly MHSDS Statistics, [Metadata](https://nhs-prod.global.ssl.fastly.net/binaries/content/assets/website-assets/data-and-information/data-sets/mhsds/mhsds-monthly-metadata-1.xlsx)
+
+- **Measure code:** ED88
+- **Measure description:** The number of referrals to eating disorder services for eating disorder issues for people aged 0 - 18 waiting for treatment at the end of the reporting period
+- **Source:** NHS England, Monthly MHSDS Statistics, [Metadata](https://nhs-prod.global.ssl.fastly.net/binaries/content/assets/website-assets/data-and-information/data-sets/mhsds/mhsds-monthly-metadata-1.xlsx)
+
+- **Measure code:** ED89
+- **Measure description:** Referrals with eating disorder issues categorized as urgent waiting for treatment end RP, aged 0-18
+- **Source:** NHS England, Monthly MHSDS Statistics, [Metadata](https://nhs-prod.global.ssl.fastly.net/binaries/content/assets/website-assets/data-and-information/data-sets/mhsds/mhsds-monthly-metadata-1.xlsx)
+
+- **Measure code:** ED90
+- **Measure description:** Referrals with eating disorder issues categorized as routine waiting for treatment end RP, aged 0-18
+- **Source:** NHS England, Monthly MHSDS Statistics, [Metadata](https://nhs-prod.global.ssl.fastly.net/binaries/content/assets/website-assets/data-and-information/data-sets/mhsds/mhsds-monthly-metadata-1.xlsx)
+
+```{r ed.targets2, echo=TRUE, message=FALSE, warning=FALSE,fig.width=8,fig.height=6}
+#Eating disorders data
+ref_ed_data_new <- MHSDS_main_pooled_dashboard %>%
+  filter(.,PRIMARY_LEVEL_DESCRIPTION=="England",
+         MEASURE_ID %in% c("ED89","ED90")) %>%
+  select(.,start_date,end_date,PRIMARY_LEVEL_DESCRIPTION,MEASURE_ID,MEASURE_VALUE)
+
+ref_ed_data_new <- MHSDS_ED_pooled_dashboard %>%
+  filter(.,PRIMARY_LEVEL_DESCRIPTION=="England",
+         MEASURE_ID %in% c("ED89","ED90")) %>%
+  select(.,start_date,end_date,PRIMARY_LEVEL_DESCRIPTION,MEASURE_ID,MEASURE_VALUE) %>%
+  plyr::rbind.fill(.,ref_ed_data_new) %>% 
+  mutate(.,MEASURE_VALUE=as.numeric(MEASURE_VALUE),
+         Type=case_when(MEASURE_ID=="ED89" ~ "Urgent",
+                        MEASURE_ID=="ED90" ~ "Routine",
+                        TRUE ~ "NA"),
+         Metric="Waiting for treatment",
+         time_window=ymd(end_date)-ymd(start_date))
+
+#Eating disorders chart 2
+ref_ed_chart <- ref_ed_data_new %>%
+  ggplot(., aes(x=end_date, y=MEASURE_VALUE, group=Type)) +
+  geom_line(aes(color=Type),size=1) +
+  scale_x_date(date_labels = "%b %Y",date_breaks = "1 month") +
+  scale_y_continuous(labels = scales::comma) +
+  theme_ipsum() +
+  xlab("") +
+  ylab("") +
+  labs(col="", title="") +
+  theme(legend.position="bottom",
+        panel.border = element_blank(),
+        strip.text = element_text(size=8),
+        text = element_text(size = 8),
+        legend.title=element_text(size=8),
+        legend.text=element_text(size=8),
+        axis.text = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.text.x = element_text(angle = 45, hjust = 1,size = 8),
+        axis.title.x = element_text(margin = unit(c(3, 0, 0, 0), "mm"),size = 8),
+        axis.title.y = element_text(size = 8))
+
+ggplotly(ref_ed_chart)
+```
+
+```{r combined.ed, echo=FALSE, message=FALSE, warning=FALSE}
+
+combined.ed.data <- plyr::rbind.fill(ref_ed_data_new,target_time_ed_data) %>%
+  filter(.,end_date>ymd("2020-08-01")) %>% 
+  select(.,end_date,time_window,MEASURE_VALUE,Metric,Type) %>%
+  pivot_wider(
+    names_from = Metric,
+    names_sep = ".",
+    values_from = c(MEASURE_VALUE)
+  ) %>%
+  arrange(.,Type,end_date)
+
+#fwrite(combined.ed.data,paste0(onedrive_charts_data,"ED_charts.csv"))
+```
+
+```{r crisis.referrals, echo=TRUE, message=FALSE, warning=FALSE,fig.width=8,fig.height=6}
+#Crisis referrals
+crisis_referrals_data <- MHSDS_main_pooled_dashboard %>%
+  filter(.,PRIMARY_LEVEL_DESCRIPTION=="England",
+         MEASURE_ID %in% c("CCR70b","CCR71b")) %>%
+  select(.,start_date,end_date,PRIMARY_LEVEL_DESCRIPTION,MEASURE_ID,MEASURE_VALUE) %>% 
+  mutate(.,MEASURE_VALUE=as.numeric(MEASURE_VALUE),
+         Type=case_when(MEASURE_ID=="CCR71b" ~ "Urgent",
+                        MEASURE_ID=="CCR70b" ~ "Emergency",
+                        TRUE ~ "NA"),
+         Metric="New referrals",
+         time_window=ymd(end_date)-ymd(start_date))
+
+#Eating disorders chart 2
+crisis_referrals_chart <- crisis_referrals_data %>%
+  ggplot(., aes(x=end_date, y=MEASURE_VALUE, group=Type)) +
+  geom_line(aes(color=Type),size=1) +
+  scale_x_date(date_labels = "%b %Y",date_breaks = "1 month") +
+  scale_y_continuous(labels = scales::comma) +
+  theme_ipsum() +
+  xlab("") +
+  ylab("") +
+  labs(col="", title="") +
+  theme(legend.position="bottom",
+        panel.border = element_blank(),
+        strip.text = element_text(size=8),
+        text = element_text(size = 8),
+        legend.title=element_text(size=8),
+        legend.text=element_text(size=8),
+        axis.text = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.text.x = element_text(angle = 45, hjust = 1,size = 8),
+        axis.title.x = element_text(margin = unit(c(3, 0, 0, 0), "mm"),size = 8),
+        axis.title.y = element_text(size = 8))
+
+ggplotly(crisis_referrals_chart)
+
+crisis_referrals_data_flourish <- crisis_referrals_data %>% 
+  select(.,end_date,time_window,MEASURE_VALUE,Metric,Type) %>%
+  pivot_wider(
+    names_from = "Type",
+    names_sep = ".",
+    values_from = c(MEASURE_VALUE)
+  ) %>%
+  arrange(.,end_date)
+
+#fwrite(crisis_referrals_data_flourish,paste0(onedrive_charts_data,"crisis_charts.csv"))
+
+```
+
+```{r ED.referrals, echo=TRUE, message=FALSE, warning=FALSE,fig.width=8,fig.height=6}
+#ED referrals
+ED_referrals_data <- MHSDS_main_pooled_dashboard %>%
+  filter(.,PRIMARY_LEVEL_DESCRIPTION=="England",
+         MEASURE_ID %in% c("ED32")) %>%
+  select(.,start_date,end_date,PRIMARY_LEVEL_DESCRIPTION,MEASURE_ID,MEASURE_VALUE) %>% 
+  mutate(.,MEASURE_VALUE=as.numeric(MEASURE_VALUE),
+         Metric="New referrals",
+         time_window=ymd(end_date)-ymd(start_date))
+
+#Eating disorders chart 3
+ED_referrals_chart <- ED_referrals_data %>%
+  ggplot(., aes(x=end_date, y=MEASURE_VALUE)) +
+  geom_line() +
+  scale_x_date(date_labels = "%b %Y",date_breaks = "1 month") +
+  scale_y_continuous(labels = scales::comma) +
+  theme_ipsum() +
+  xlab("") +
+  ylab("") +
+  labs(col="", title="") +
+  theme(legend.position="bottom",
+        panel.border = element_blank(),
+        strip.text = element_text(size=8),
+        text = element_text(size = 8),
+        legend.title=element_text(size=8),
+        legend.text=element_text(size=8),
+        axis.text = element_text(size = 8),
+        axis.text.y = element_text(size = 8),
+        axis.text.x = element_text(angle = 45, hjust = 1,size = 8),
+        axis.title.y = element_text(size = 8))
+
+#ggplotly(ED_referrals_chart)
+
+ED_referrals_data_flourish <- ED_referrals_data %>% 
+  select(.,end_date,time_window,MEASURE_VALUE,Metric) %>%
+  arrange(.,end_date)
+
+#fwrite(ED_referrals_data_flourish,paste0(onedrive_charts_data,"EDref_charts.csv"))
+
 ```
 
 ## Health Education England data on workforce (compared to activity levels from NHS England)

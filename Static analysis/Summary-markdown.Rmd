@@ -130,7 +130,7 @@ survey.data <- data.frame(est.number=c(830040,1253264,1314867),
   mutate(.,est.prev=est.prev/100)
 
 #Chart 1
-survey.chart <-ggplot(data=survey.data, aes(x=year, y=est.prev)) +
+survey.chart <- ggplot(data=survey.data, aes(x=year, y=est.prev)) +
   geom_bar(stat="identity", fill="deeppink3") +
   scale_y_continuous(labels = scales::percent) +
   theme_ipsum() +
